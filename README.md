@@ -4,10 +4,13 @@ A World of Warcraft addon that automatically collapses the quest log when enteri
 
 ## Features
 
-- **Automatic Quest Log Management**: Automatically collapses the quest log when entering dungeons/raids and expands it when leaving
-- **Configurable**: Enable/disable the addon functionality with simple commands
+- **Automatic Quest Log Management**: Automatically collapses quest log sections when entering instances and expands them when leaving
+- **Instance Type Configuration**: Different settings for dungeons, raids, scenarios, battlegrounds, and arenas
+- **Individual Section Control**: Fine-grained control over which objective tracker sections to collapse (quests, achievements, bonus objectives, etc.)
+- **Character-Specific Profiles**: Settings saved per character with support for multiple profiles
+- **GUI Configuration**: Easy-to-use configuration panel accessible via `/qlc config`
 - **Debug Mode**: Optional debug messages to track addon behavior
-- **Manual Control**: Commands to manually collapse/expand the quest log
+- **Manual Control**: Commands to manually collapse/expand configured sections
 - **Lightweight**: Minimal performance impact with efficient event handling
 
 ## Installation
@@ -21,48 +24,93 @@ A World of Warcraft addon that automatically collapses the quest log when enteri
 
 ## Commands
 
-The addon provides several slash commands for configuration and manual control:
+The addon provides several slash commands for basic control:
 
 - `/qlc` or `/questlogcollapse` - Show help menu
+- `/qlc config` - Open the configuration panel (recommended)
 - `/qlc toggle` - Enable/disable the addon
 - `/qlc debug` - Toggle debug messages on/off
-- `/qlc status` - Show current addon status and settings
-- `/qlc collapse` - Manually collapse the quest log
-- `/qlc expand` - Manually expand the quest log
+- `/qlc status` - Show current addon status and section states
+- `/qlc collapse` - Manually collapse configured sections
+- `/qlc expand` - Manually expand configured sections
 - `/qlc help` - Show all available commands
+
+## Configuration
+
+The addon features a comprehensive configuration panel accessible via `/qlc config`. The panel allows you to:
+
+### Profile Management
+- Create multiple profiles for different characters or situations
+- Switch between profiles easily
+- Each character can have their own profile settings
+
+### Instance Type Settings
+Configure different behaviors for each type of instance:
+- **Dungeons**: 5-player group content
+- **Raids**: Large group content  
+- **Scenarios**: Solo/small group story content
+- **Battlegrounds**: PvP battleground content
+- **Arenas**: PvP arena content
+
+### Individual Section Control
+For each instance type, you can control which objective tracker sections get collapsed:
+- **Quests**: Regular quest objectives
+- **Achievements**: Achievement progress tracking
+- **Bonus Objectives**: World quest and bonus objectives
+- **Scenarios**: Scenario-specific objectives
+- **Campaigns**: Campaign quest lines
+- **Professions**: Profession recipe tracking
+- **Monthly Activities**: Monthly event tracking
+- **UI Widgets**: Special UI widget objectives
+- **Adventure Maps**: Adventure map objectives
 
 ## How It Works
 
 The addon uses the World of Warcraft API to:
 
 1. **Detect Zone Changes**: Listens to the `ZONE_CHANGED_NEW_AREA` event
-2. **Check Instance Type**: Uses `IsInInstance()` to determine if you're in a dungeon or raid
-3. **Manage Quest Log**: Uses the `questLogCollapseFilter` CVar to control quest log state
-   - `0` = Expanded quest log
-   - `1` = Collapsed quest log
+2. **Check Instance Type**: Uses `IsInInstance()` to determine if you're in a dungeon, raid, scenario, battleground, or arena
+3. **Apply Instance-Specific Settings**: Uses different configurations based on the type of instance you're in
+4. **Manage Individual Sections**: Controls specific ObjectiveTracker modules rather than the entire frame
+   - `QuestObjectiveTracker` - Regular quests
+   - `AchievementObjectiveTracker` - Achievements  
+   - `BonusObjectiveTracker` - World quests and bonus objectives
+   - `ScenarioObjectiveTracker` - Scenario objectives
+   - `CampaignQuestObjectiveTracker` - Campaign quests
+   - `ProfessionsRecipeTracker` - Profession recipes
+   - `MonthlyActivitiesObjectiveTracker` - Monthly activities
+   - `UIWidgetObjectiveTracker` - UI widget objectives
 
 ## Technical Details
 
-### Files Structure
+### File Structure
 ```
 QuestLogCollapse/
-├── QuestLogCollapse.toc    # Addon metadata and file loading
-└── QuestLogCollapse.lua    # Main addon logic
+├── QuestLogCollapse.toc           # Addon metadata and file loading
+├── QuestLogCollapse.lua           # Main addon logic and event handling  
+└── QuestLogCollapse_Config.lua    # Configuration panel and profile management
 ```
 
 ### Events Handled
 - `ADDON_LOADED` - Initialize settings when addon loads
 - `ZONE_CHANGED_NEW_AREA` - Detect when player changes zones/instances
 
-### CVars Used
-- `questLogCollapseFilter` - Controls the quest log collapse state
+### Database Structure
+- `QuestLogCollapseDB` - Global settings and profiles
+- `QuestLogCollapseCharDB` - Character-specific settings (current profile)
 
 ## Configuration
 
-Settings are automatically saved to your character and include:
+Settings are organized into profiles with the following structure:
 
+### Global Settings
 - `enabled` (default: true) - Whether the addon is active
 - `debug` (default: false) - Whether to show debug messages
+
+### Instance Type Settings (per profile)
+Each instance type (dungeons, raids, scenarios, battlegrounds, arenas) has:
+- `enabled` - Whether to process this instance type
+- Individual section collapse settings for each ObjectiveTracker module
 
 ## Compatibility
 
@@ -74,14 +122,27 @@ Settings are automatically saved to your character and include:
 
 ### Quest Log Not Collapsing/Expanding
 1. Check if the addon is enabled: `/qlc status`
-2. Enable debug mode to see what's happening: `/qlc debug`
-3. Try manually toggling: `/qlc collapse` or `/qlc expand`
+2. Open the configuration panel: `/qlc config`
+3. Verify that the current instance type is enabled in your active profile
+4. Check that the specific sections you want collapsed are enabled for that instance type
+5. Enable debug mode to see what's happening: `/qlc debug`
+6. Try manually toggling: `/qlc collapse` or `/qlc expand`
 
 ### Addon Not Loading
 1. Ensure files are in the correct directory
 2. Check that `QuestLogCollapse.toc` has the correct interface version
-3. Make sure both files are present and properly named
+3. Make sure all files are present and properly named (`QuestLogCollapse.lua`, `QuestLogCollapse_Config.lua`)
 4. Try `/reload` to refresh addons
+
+### Configuration Panel Not Opening
+1. Make sure both lua files are loaded properly
+2. Check for any lua errors using an error display addon
+3. Try `/qlc help` to see if basic commands work
+
+### Settings Not Saving
+1. Check that you have write permissions in your WoW directory
+2. Verify that `SavedVariables` and `SavedVariablesPerCharacter` are working
+3. Settings are saved when you log out or `/reload`
 
 ### Debug Information
 Enable debug mode with `/qlc debug` to see detailed information about:

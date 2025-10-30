@@ -4,5 +4,7 @@
 ## Author: Gaspode
 ## Version: 1.0.0
 ## SavedVariables: QuestLogCollapseDB
+## SavedVariablesPerCharacter: QuestLogCollapseCharDB
 
 QuestLogCollapse.lua
+QuestLogCollapse_Config.lua

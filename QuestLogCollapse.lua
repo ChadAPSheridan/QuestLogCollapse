@@ -191,8 +191,7 @@ function SlashCmdList.QUESTLOGCOLLAPSE(msg)
         print("|cffff0000/qlc status|r - Show current status")
         print("|cffff0000/qlc collapse|r - Manually collapse configured sections")
         print("|cffff0000/qlc expand|r - Manually expand configured sections")
-        print("|cffff0000/qlc config|r - Show configuration options")
-        print("|cffff0000/qlc set <section> <true/false>|r - Configure section")
+        print("|cffff0000/qlc config|r - Open configuration panel")
         print("Available sections: quests, achievements, bonus, scenarios,")
         print("campaigns, professions, monthly, widgets, adventuremaps")
     elseif args[1] == "toggle" then
@@ -202,49 +201,26 @@ function SlashCmdList.QUESTLOGCOLLAPSE(msg)
         QuestLogCollapseDB.debug = not QuestLogCollapseDB.debug
         print("|cff00ff00QuestLogCollapse|r debug " .. (QuestLogCollapseDB.debug and "enabled" or "disabled"))
     elseif args[1] == "config" then
-        print("|cff00ff00QuestLogCollapse Configuration:|r")
-        print("Quests: " .. (QuestLogCollapseDB.collapseQuests and "ON" or "OFF"))
-        print("Achievements: " .. (QuestLogCollapseDB.collapseAchievements and "ON" or "OFF"))
-        print("Bonus Objectives: " .. (QuestLogCollapseDB.collapseBonusObjectives and "ON" or "OFF"))
-        print("Scenarios: " .. (QuestLogCollapseDB.collapseScenarios and "ON" or "OFF"))
-        print("Campaigns: " .. (QuestLogCollapseDB.collapseCampaigns and "ON" or "OFF"))
-        print("Professions: " .. (QuestLogCollapseDB.collapseProfessions and "ON" or "OFF"))
-        print("Monthly Activities: " .. (QuestLogCollapseDB.collapseMonthlyActivities and "ON" or "OFF"))
-        print("UI Widgets: " .. (QuestLogCollapseDB.collapseUIWidgets and "ON" or "OFF"))
-        print("Adventure Maps: " .. (QuestLogCollapseDB.collapseAdventureMaps and "ON" or "OFF"))
-    elseif args[1] == "set" and args[2] and args[3] then
-        local section = args[2]
-        local value = args[3] == "true"
-        
-        if section == "quests" then
-            QuestLogCollapseDB.collapseQuests = value
-            print("|cff00ff00QuestLogCollapse|r Quests collapse: " .. (value and "ON" or "OFF"))
-        elseif section == "achievements" then
-            QuestLogCollapseDB.collapseAchievements = value
-            print("|cff00ff00QuestLogCollapse|r Achievements collapse: " .. (value and "ON" or "OFF"))
-        elseif section == "bonus" then
-            QuestLogCollapseDB.collapseBonusObjectives = value
-            print("|cff00ff00QuestLogCollapse|r Bonus objectives collapse: " .. (value and "ON" or "OFF"))
-        elseif section == "scenarios" then
-            QuestLogCollapseDB.collapseScenarios = value
-            print("|cff00ff00QuestLogCollapse|r Scenarios collapse: " .. (value and "ON" or "OFF"))
-        elseif section == "campaigns" then
-            QuestLogCollapseDB.collapseCampaigns = value
-            print("|cff00ff00QuestLogCollapse|r Campaigns collapse: " .. (value and "ON" or "OFF"))
-        elseif section == "professions" then
-            QuestLogCollapseDB.collapseProfessions = value
-            print("|cff00ff00QuestLogCollapse|r Professions collapse: " .. (value and "ON" or "OFF"))
-        elseif section == "monthly" then
-            QuestLogCollapseDB.collapseMonthlyActivities = value
-            print("|cff00ff00QuestLogCollapse|r Monthly activities collapse: " .. (value and "ON" or "OFF"))
-        elseif section == "widgets" then
-            QuestLogCollapseDB.collapseUIWidgets = value
-            print("|cff00ff00QuestLogCollapse|r UI widgets collapse: " .. (value and "ON" or "OFF"))
-        elseif section == "adventuremaps" then
-            QuestLogCollapseDB.collapseAdventureMaps = value
-            print("|cff00ff00QuestLogCollapse|r Adventure maps collapse: " .. (value and "ON" or "OFF"))
+        if CreateQuestLogCollapseConfigPanel then
+            local configPanel = CreateQuestLogCollapseConfigPanel()
+            if Settings and Settings.OpenToCategory then
+                -- Try to register and open in the new settings system
+                if not configPanel.categoryID then
+                    configPanel.categoryID = Settings.RegisterCanvasLayoutCategory(configPanel, "QuestLogCollapse")
+                    Settings.RegisterAddOnCategory(configPanel.categoryID)
+                end
+                Settings.OpenToCategory(configPanel.categoryID)
+            elseif InterfaceOptionsFrame_OpenToCategory and configPanel then
+                -- Fallback to old interface options
+                InterfaceOptions_AddCategory(configPanel)
+                InterfaceOptionsFrame_OpenToCategory(configPanel)
+                InterfaceOptionsFrame_OpenToCategory(configPanel) -- Called twice for proper display
+            else
+                -- Direct show if other methods fail
+                configPanel:Show()
+            end
         else
-            print("|cff00ff00QuestLogCollapse|r Unknown section. Use /qlc help for available sections.")
+            print("|cff00ff00QuestLogCollapse|r Configuration panel not available.")
         end
     elseif args[1] == "status" then
         print("|cff00ff00QuestLogCollapse Status:|r")
