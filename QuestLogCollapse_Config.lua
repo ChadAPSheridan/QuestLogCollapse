@@ -369,20 +369,42 @@ function CreateQuestLogCollapseConfigPanel()
     return panel
 end
 
--- Event frame for initialization
+-- Event frame for initialization and panel registration
 local configEventFrame = CreateFrame("Frame")
 configEventFrame:RegisterEvent("ADDON_LOADED")
+configEventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+
+local panelRegistered = false
 
 configEventFrame:SetScript("OnEvent", function(self, event, addonName)
     if event == "ADDON_LOADED" and addonName == "QuestLogCollapse" then
         InitializeConfigDB()
-        self:UnregisterEvent("ADDON_LOADED")
+    elseif event == "PLAYER_ENTERING_WORLD" then
+        if not panelRegistered then
+            -- Register the panel in the options menu
+            local configPanel = CreateQuestLogCollapseConfigPanel()
+            
+            -- Register with the new settings system (WoW 10.0+)
+            if Settings and Settings.RegisterAddOnCategory and Settings.RegisterCanvasLayoutCategory then
+                local category = Settings.RegisterCanvasLayoutCategory(configPanel, "QuestLogCollapse")
+                Settings.RegisterAddOnCategory(category)
+                configPanel.categoryID = category
+            -- Fallback to old interface options (pre-10.0)
+            elseif InterfaceOptions_AddCategory then
+                InterfaceOptions_AddCategory(configPanel)
+            end
+            
+            panelRegistered = true
+        end
+        self:UnregisterEvent("PLAYER_ENTERING_WORLD")
     end
 end)
 
--- Update the main addon functions to use profile settings
-local function GetCurrentInstanceSettings()
+-- Global function to get current instance settings (used by main addon)
+function GetCurrentInstanceSettings()
     local prof = getProfile()
+    if not prof then return nil end
+    
     local instanceType = select(2, IsInInstance())
     
     if instanceType == "party" then
@@ -400,166 +422,7 @@ local function GetCurrentInstanceSettings()
     return nil
 end
 
--- Override the main addon's functions
-if QuestLogCollapseDB then
-    -- Update the collapse/expand functions to use instance-specific settings
-    local originalCollapseQuestLog = CollapseQuestLog
-    local originalExpandQuestLog = ExpandQuestLog
-    local originalOnZoneChanged = OnZoneChanged
-
-    function CollapseQuestLog()
-        local settings = GetCurrentInstanceSettings()
-        if not settings or not settings.enabled then return end
-        
-        if settings.collapseQuests and QuestObjectiveTracker then
-            QuestObjectiveTracker:SetCollapsed(true)
-            if QuestLogCollapseCharDB and getProfile().debug then
-                print("|cff00ff00[QuestLogCollapse]|r Quest section collapsed")
-            end
-        end
-        
-        if settings.collapseAchievements and AchievementObjectiveTracker then
-            AchievementObjectiveTracker:SetCollapsed(true)
-            if QuestLogCollapseCharDB and getProfile().debug then
-                print("|cff00ff00[QuestLogCollapse]|r Achievement section collapsed")
-            end
-        end
-        
-        if settings.collapseBonusObjectives and BonusObjectiveTracker then
-            BonusObjectiveTracker:SetCollapsed(true)
-            if QuestLogCollapseCharDB and getProfile().debug then
-                print("|cff00ff00[QuestLogCollapse]|r Bonus objectives section collapsed")
-            end
-        end
-        
-        if settings.collapseScenarios and ScenarioObjectiveTracker then
-            ScenarioObjectiveTracker:SetCollapsed(true)
-            if QuestLogCollapseCharDB and getProfile().debug then
-                print("|cff00ff00[QuestLogCollapse]|r Scenario section collapsed")
-            end
-        end
-        
-        if settings.collapseCampaigns and CampaignQuestObjectiveTracker then
-            CampaignQuestObjectiveTracker:SetCollapsed(true)
-            if QuestLogCollapseCharDB and getProfile().debug then
-                print("|cff00ff00[QuestLogCollapse]|r Campaign section collapsed")
-            end
-        end
-        
-        if settings.collapseProfessions and ProfessionsRecipeTracker then
-            ProfessionsRecipeTracker:SetCollapsed(true)
-            if QuestLogCollapseCharDB and getProfile().debug then
-                print("|cff00ff00[QuestLogCollapse]|r Professions section collapsed")
-            end
-        end
-        
-        if settings.collapseMonthlyActivities and MonthlyActivitiesObjectiveTracker then
-            MonthlyActivitiesObjectiveTracker:SetCollapsed(true)
-            if QuestLogCollapseCharDB and getProfile().debug then
-                print("|cff00ff00[QuestLogCollapse]|r Monthly activities section collapsed")
-            end
-        end
-        
-        if settings.collapseUIWidgets and UIWidgetObjectiveTracker then
-            UIWidgetObjectiveTracker:SetCollapsed(true)
-            if QuestLogCollapseCharDB and getProfile().debug then
-                print("|cff00ff00[QuestLogCollapse]|r UI widgets section collapsed")
-            end
-        end
-        
-        if settings.collapseAdventureMaps and AdventureMapQuestObjectiveTracker then
-            AdventureMapQuestObjectiveTracker:SetCollapsed(true)
-            if QuestLogCollapseCharDB and getProfile().debug then
-                print("|cff00ff00[QuestLogCollapse]|r Adventure map section collapsed")
-            end
-        end
-    end
-
-    function ExpandQuestLog()
-        local settings = GetCurrentInstanceSettings()
-        if not settings or not settings.enabled then return end
-        
-        if settings.collapseQuests and QuestObjectiveTracker then
-            QuestObjectiveTracker:SetCollapsed(false)
-            if QuestLogCollapseCharDB and getProfile().debug then
-                print("|cff00ff00[QuestLogCollapse]|r Quest section expanded")
-            end
-        end
-        
-        if settings.collapseAchievements and AchievementObjectiveTracker then
-            AchievementObjectiveTracker:SetCollapsed(false)
-            if QuestLogCollapseCharDB and getProfile().debug then
-                print("|cff00ff00[QuestLogCollapse]|r Achievement section expanded")
-            end
-        end
-        
-        if settings.collapseBonusObjectives and BonusObjectiveTracker then
-            BonusObjectiveTracker:SetCollapsed(false)
-            if QuestLogCollapseCharDB and getProfile().debug then
-                print("|cff00ff00[QuestLogCollapse]|r Bonus objectives section expanded")
-            end
-        end
-        
-        if settings.collapseScenarios and ScenarioObjectiveTracker then
-            ScenarioObjectiveTracker:SetCollapsed(false)
-            if QuestLogCollapseCharDB and getProfile().debug then
-                print("|cff00ff00[QuestLogCollapse]|r Scenario section expanded")
-            end
-        end
-        
-        if settings.collapseCampaigns and CampaignQuestObjectiveTracker then
-            CampaignQuestObjectiveTracker:SetCollapsed(false)
-            if QuestLogCollapseCharDB and getProfile().debug then
-                print("|cff00ff00[QuestLogCollapse]|r Campaign section expanded")
-            end
-        end
-        
-        if settings.collapseProfessions and ProfessionsRecipeTracker then
-            ProfessionsRecipeTracker:SetCollapsed(false)
-            if QuestLogCollapseCharDB and getProfile().debug then
-                print("|cff00ff00[QuestLogCollapse]|r Professions section expanded")
-            end
-        end
-        
-        if settings.collapseMonthlyActivities and MonthlyActivitiesObjectiveTracker then
-            MonthlyActivitiesObjectiveTracker:SetCollapsed(false)
-            if QuestLogCollapseCharDB and getProfile().debug then
-                print("|cff00ff00[QuestLogCollapse]|r Monthly activities section expanded")
-            end
-        end
-        
-        if settings.collapseUIWidgets and UIWidgetObjectiveTracker then
-            UIWidgetObjectiveTracker:SetCollapsed(false)
-            if QuestLogCollapseCharDB and getProfile().debug then
-                print("|cff00ff00[QuestLogCollapse]|r UI widgets section expanded")
-            end
-        end
-        
-        if settings.collapseAdventureMaps and AdventureMapQuestObjectiveTracker then
-            AdventureMapQuestObjectiveTracker:SetCollapsed(false)
-            if QuestLogCollapseCharDB and getProfile().debug then
-                print("|cff00ff00[QuestLogCollapse]|r Adventure map section expanded")
-            end
-        end
-    end
-
-    function OnZoneChanged()
-        local prof = getProfile()
-        if not prof.enabled then return end
-        
-        local settings = GetCurrentInstanceSettings()
-        if not settings or not settings.enabled then return end
-        
-        if IsInDungeon() then
-            if QuestLogCollapseCharDB and prof.debug then
-                print("|cff00ff00[QuestLogCollapse]|r Entered instance - collapsing configured sections")
-            end
-            CollapseQuestLog()
-        else
-            if QuestLogCollapseCharDB and prof.debug then
-                print("|cff00ff00[QuestLogCollapse]|r Left instance - expanding configured sections")
-            end
-            ExpandQuestLog()
-        end
-    end
+-- Global function to get current profile (used by main addon)
+function GetCurrentQLCProfile()
+    return getProfile()
 end
