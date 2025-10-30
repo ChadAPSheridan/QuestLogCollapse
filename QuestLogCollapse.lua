@@ -25,124 +25,211 @@ local defaults = {
 QuestLogCollapseDB = QuestLogCollapseDB or {}
 
 local function DebugPrint(message)
-    if QuestLogCollapseDB.debug then
+    local profile = GetCurrentQLCProfile and GetCurrentQLCProfile() or QuestLogCollapseDB
+    if profile and profile.debug then
         print("|cff00ff00[QuestLogCollapse]|r " .. message)
     end
 end
 
 local function IsInDungeon()
     local instanceType = select(2, IsInInstance())
-    return instanceType == "party" or instanceType == "raid"
+    return instanceType == "party" or instanceType == "raid" or instanceType == "scenario" or instanceType == "pvp" or instanceType == "arena"
 end
 
 local function CollapseQuestLog()
-    -- Collapse individual sections based on settings
-    if QuestLogCollapseDB.collapseQuests and QuestObjectiveTracker then
-        QuestObjectiveTracker:SetCollapsed(true)
-        DebugPrint("Quest section collapsed")
-    end
+    -- Get instance-specific settings from config system
+    local settings = GetCurrentInstanceSettings and GetCurrentInstanceSettings()
     
-    if QuestLogCollapseDB.collapseAchievements and AchievementObjectiveTracker then
-        AchievementObjectiveTracker:SetCollapsed(true)
-        DebugPrint("Achievement section collapsed")
-    end
+    DebugPrint("CollapseQuestLog() called")
     
-    if QuestLogCollapseDB.collapseBonusObjectives and BonusObjectiveTracker then
-        BonusObjectiveTracker:SetCollapsed(true)
-        DebugPrint("Bonus objectives section collapsed")
-    end
-    
-    if QuestLogCollapseDB.collapseScenarios and ScenarioObjectiveTracker then
-        ScenarioObjectiveTracker:SetCollapsed(true)
-        DebugPrint("Scenario section collapsed")
-    end
-    
-    if QuestLogCollapseDB.collapseCampaigns and CampaignQuestObjectiveTracker then
-        CampaignQuestObjectiveTracker:SetCollapsed(true)
-        DebugPrint("Campaign section collapsed")
-    end
-    
-    if QuestLogCollapseDB.collapseProfessions and ProfessionsRecipeTracker then
-        ProfessionsRecipeTracker:SetCollapsed(true)
-        DebugPrint("Professions section collapsed")
-    end
-    
-    if QuestLogCollapseDB.collapseMonthlyActivities and MonthlyActivitiesObjectiveTracker then
-        MonthlyActivitiesObjectiveTracker:SetCollapsed(true)
-        DebugPrint("Monthly activities section collapsed")
-    end
-    
-    if QuestLogCollapseDB.collapseUIWidgets and UIWidgetObjectiveTracker then
-        UIWidgetObjectiveTracker:SetCollapsed(true)
-        DebugPrint("UI widgets section collapsed")
-    end
-    
-    if QuestLogCollapseDB.collapseAdventureMaps and AdventureMapQuestObjectiveTracker then
-        AdventureMapQuestObjectiveTracker:SetCollapsed(true)
-        DebugPrint("Adventure map section collapsed")
-    end
-end
-
-local function ExpandQuestLog()
-    -- Expand individual sections based on settings
-    if QuestLogCollapseDB.collapseQuests and QuestObjectiveTracker then
-        QuestObjectiveTracker:SetCollapsed(false)
-        DebugPrint("Quest section expanded")
-    end
-    
-    if QuestLogCollapseDB.collapseAchievements and AchievementObjectiveTracker then
-        AchievementObjectiveTracker:SetCollapsed(false)
-        DebugPrint("Achievement section expanded")
-    end
-    
-    if QuestLogCollapseDB.collapseBonusObjectives and BonusObjectiveTracker then
-        BonusObjectiveTracker:SetCollapsed(false)
-        DebugPrint("Bonus objectives section expanded")
-    end
-    
-    if QuestLogCollapseDB.collapseScenarios and ScenarioObjectiveTracker then
-        ScenarioObjectiveTracker:SetCollapsed(false)
-        DebugPrint("Scenario section expanded")
-    end
-    
-    if QuestLogCollapseDB.collapseCampaigns and CampaignQuestObjectiveTracker then
-        CampaignQuestObjectiveTracker:SetCollapsed(false)
-        DebugPrint("Campaign section expanded")
-    end
-    
-    if QuestLogCollapseDB.collapseProfessions and ProfessionsRecipeTracker then
-        ProfessionsRecipeTracker:SetCollapsed(false)
-        DebugPrint("Professions section expanded")
-    end
-    
-    if QuestLogCollapseDB.collapseMonthlyActivities and MonthlyActivitiesObjectiveTracker then
-        MonthlyActivitiesObjectiveTracker:SetCollapsed(false)
-        DebugPrint("Monthly activities section expanded")
-    end
-    
-    if QuestLogCollapseDB.collapseUIWidgets and UIWidgetObjectiveTracker then
-        UIWidgetObjectiveTracker:SetCollapsed(false)
-        DebugPrint("UI widgets section expanded")
-    end
-    
-    if QuestLogCollapseDB.collapseAdventureMaps and AdventureMapQuestObjectiveTracker then
-        AdventureMapQuestObjectiveTracker:SetCollapsed(false)
-        DebugPrint("Adventure map section expanded")
-    end
-end
-
-local function OnZoneChanged()
-    if not QuestLogCollapseDB.enabled then
+    if not settings then
+        DebugPrint("No instance settings found")
         return
     end
     
-    if IsInDungeon() then
-        DebugPrint("Entered dungeon/raid - collapsing quest log")
-        CollapseQuestLog()
-    else
-        DebugPrint("Left dungeon/raid - expanding quest log")
-        ExpandQuestLog()
+    if not settings.enabled then
+        DebugPrint("Instance type not enabled for collapsing")
+        return
     end
+    
+    DebugPrint("Instance settings found and enabled, proceeding with collapse")
+    local collapsed = 0
+    
+    if settings.collapseQuests and QuestObjectiveTracker then
+        QuestObjectiveTracker:SetCollapsed(true)
+        DebugPrint("Quest section collapsed")
+        collapsed = collapsed + 1
+    end
+    
+    if settings.collapseAchievements and AchievementObjectiveTracker then
+        AchievementObjectiveTracker:SetCollapsed(true)
+        DebugPrint("Achievement section collapsed")
+        collapsed = collapsed + 1
+    end
+    
+    if settings.collapseBonusObjectives and BonusObjectiveTracker then
+        BonusObjectiveTracker:SetCollapsed(true)
+        DebugPrint("Bonus objectives section collapsed")
+        collapsed = collapsed + 1
+    end
+    
+    if settings.collapseScenarios and ScenarioObjectiveTracker then
+        ScenarioObjectiveTracker:SetCollapsed(true)
+        DebugPrint("Scenario section collapsed")
+        collapsed = collapsed + 1
+    end
+    
+    if settings.collapseCampaigns and CampaignQuestObjectiveTracker then
+        CampaignQuestObjectiveTracker:SetCollapsed(true)
+        DebugPrint("Campaign section collapsed")
+        collapsed = collapsed + 1
+    end
+    
+    if settings.collapseProfessions and ProfessionsRecipeTracker then
+        ProfessionsRecipeTracker:SetCollapsed(true)
+        DebugPrint("Professions section collapsed")
+        collapsed = collapsed + 1
+    end
+    
+    if settings.collapseMonthlyActivities and MonthlyActivitiesObjectiveTracker then
+        MonthlyActivitiesObjectiveTracker:SetCollapsed(true)
+        DebugPrint("Monthly activities section collapsed")
+        collapsed = collapsed + 1
+    end
+    
+    if settings.collapseUIWidgets and UIWidgetObjectiveTracker then
+        UIWidgetObjectiveTracker:SetCollapsed(true)
+        DebugPrint("UI widgets section collapsed")
+        collapsed = collapsed + 1
+    end
+    
+    if settings.collapseAdventureMaps and AdventureMapQuestObjectiveTracker then
+        AdventureMapQuestObjectiveTracker:SetCollapsed(true)
+        DebugPrint("Adventure map section collapsed")
+        collapsed = collapsed + 1
+    end
+    
+    DebugPrint("Collapsed " .. collapsed .. " sections")
+end
+
+local function ExpandQuestLog()
+    -- When leaving an instance, expand all sections regardless of settings
+    -- This ensures we restore the original state
+    
+    DebugPrint("ExpandQuestLog() called")
+    local expanded = 0
+    
+    if QuestObjectiveTracker then
+        QuestObjectiveTracker:SetCollapsed(false)
+        DebugPrint("Quest section expanded")
+        expanded = expanded + 1
+    else
+        DebugPrint("QuestObjectiveTracker not found")
+    end
+    
+    if AchievementObjectiveTracker then
+        AchievementObjectiveTracker:SetCollapsed(false)
+        DebugPrint("Achievement section expanded")
+        expanded = expanded + 1
+    else
+        DebugPrint("AchievementObjectiveTracker not found")
+    end
+    
+    if BonusObjectiveTracker then
+        BonusObjectiveTracker:SetCollapsed(false)
+        DebugPrint("Bonus objectives section expanded")
+        expanded = expanded + 1
+    else
+        DebugPrint("BonusObjectiveTracker not found")
+    end
+    
+    if ScenarioObjectiveTracker then
+        ScenarioObjectiveTracker:SetCollapsed(false)
+        DebugPrint("Scenario section expanded")
+        expanded = expanded + 1
+    else
+        DebugPrint("ScenarioObjectiveTracker not found")
+    end
+    
+    if CampaignQuestObjectiveTracker then
+        CampaignQuestObjectiveTracker:SetCollapsed(false)
+        DebugPrint("Campaign section expanded")
+        expanded = expanded + 1
+    else
+        DebugPrint("CampaignQuestObjectiveTracker not found")
+    end
+    
+    if ProfessionsRecipeTracker then
+        ProfessionsRecipeTracker:SetCollapsed(false)
+        DebugPrint("Professions section expanded")
+        expanded = expanded + 1
+    else
+        DebugPrint("ProfessionsRecipeTracker not found")
+    end
+    
+    if MonthlyActivitiesObjectiveTracker then
+        MonthlyActivitiesObjectiveTracker:SetCollapsed(false)
+        DebugPrint("Monthly activities section expanded")
+        expanded = expanded + 1
+    else
+        DebugPrint("MonthlyActivitiesObjectiveTracker not found")
+    end
+    
+    if UIWidgetObjectiveTracker then
+        UIWidgetObjectiveTracker:SetCollapsed(false)
+        DebugPrint("UI widgets section expanded")
+        expanded = expanded + 1
+    else
+        DebugPrint("UIWidgetObjectiveTracker not found")
+    end
+    
+    -- Try alternative method for the entire ObjectiveTrackerFrame
+    if ObjectiveTrackerFrame then
+        if ObjectiveTrackerFrame.SetCollapsed then
+            ObjectiveTrackerFrame:SetCollapsed(false)
+            DebugPrint("ObjectiveTrackerFrame expanded")
+            expanded = expanded + 1
+        end
+        
+        -- Also try expanding all modules
+        if ObjectiveTrackerFrame.MODULES then
+            for i, module in ipairs(ObjectiveTrackerFrame.MODULES) do
+                if module and module.SetCollapsed then
+                    module:SetCollapsed(false)
+                    DebugPrint("Module " .. i .. " expanded")
+                    expanded = expanded + 1
+                end
+            end
+        end
+    else
+        DebugPrint("ObjectiveTrackerFrame not found")
+    end
+    
+    DebugPrint("Expanded " .. expanded .. " sections/modules")
+end
+
+local function OnZoneChanged()
+    local profile = GetCurrentQLCProfile and GetCurrentQLCProfile() or QuestLogCollapseDB
+    if not profile or not profile.enabled then
+        DebugPrint("Addon disabled or no profile found")
+        return
+    end
+    
+    DebugPrint("Zone change detected, checking instance status...")
+    
+    -- Add a small delay to ensure accurate instance detection
+    C_Timer.After(0.5, function()
+        local inInstance, instanceType = IsInInstance()
+        DebugPrint("Instance check: inInstance=" .. tostring(inInstance) .. ", type=" .. tostring(instanceType))
+        
+        if IsInDungeon() then
+            DebugPrint("Entered instance - collapsing configured sections")
+            CollapseQuestLog()
+        else
+            DebugPrint("Left instance - expanding all collapsed sections")
+            ExpandQuestLog()
+        end
+    end)
 end
 
 local function OnAddonLoaded(addonName)
@@ -150,18 +237,21 @@ local function OnAddonLoaded(addonName)
         return
     end
     
-    -- Initialize settings with defaults
+    -- Basic initialization - detailed config handled by config file
     for key, value in pairs(defaults) do
         if QuestLogCollapseDB[key] == nil then
             QuestLogCollapseDB[key] = value
         end
     end
     
-    print("|cff00ff00QuestLogCollapse|r v1.0.0 loaded. Type |cffff0000/qlc|r for options.")
+    print("|cff00ff00QuestLogCollapse|r v1.0.0 loaded. Type |cffff0000/qlc config|r for options.")
     
     -- Check initial state
-    if IsInDungeon() and QuestLogCollapseDB.enabled then
-        CollapseQuestLog()
+    if IsInDungeon() then
+        local profile = GetCurrentQLCProfile and GetCurrentQLCProfile() or QuestLogCollapseDB
+        if profile and profile.enabled then
+            CollapseQuestLog()
+        end
     end
 end
 
@@ -190,16 +280,23 @@ function SlashCmdList.QUESTLOGCOLLAPSE(msg)
         print("|cffff0000/qlc debug|r - Toggle debug messages")
         print("|cffff0000/qlc status|r - Show current status")
         print("|cffff0000/qlc collapse|r - Manually collapse configured sections")
-        print("|cffff0000/qlc expand|r - Manually expand configured sections")
+        print("|cffff0000/qlc expand|r - Manually expand all collapsed sections")
+        print("|cffff0000/qlc test|r - Test objective tracker detection")
         print("|cffff0000/qlc config|r - Open configuration panel")
         print("Available sections: quests, achievements, bonus, scenarios,")
         print("campaigns, professions, monthly, widgets, adventuremaps")
     elseif args[1] == "toggle" then
-        QuestLogCollapseDB.enabled = not QuestLogCollapseDB.enabled
-        print("|cff00ff00QuestLogCollapse|r " .. (QuestLogCollapseDB.enabled and "enabled" or "disabled"))
+        local profile = GetCurrentQLCProfile and GetCurrentQLCProfile() or QuestLogCollapseDB
+        if profile then
+            profile.enabled = not profile.enabled
+            print("|cff00ff00QuestLogCollapse|r " .. (profile.enabled and "enabled" or "disabled"))
+        end
     elseif args[1] == "debug" then
-        QuestLogCollapseDB.debug = not QuestLogCollapseDB.debug
-        print("|cff00ff00QuestLogCollapse|r debug " .. (QuestLogCollapseDB.debug and "enabled" or "disabled"))
+        local profile = GetCurrentQLCProfile and GetCurrentQLCProfile() or QuestLogCollapseDB
+        if profile then
+            profile.debug = not profile.debug
+            print("|cff00ff00QuestLogCollapse|r debug " .. (profile.debug and "enabled" or "disabled"))
+        end
     elseif args[1] == "config" then
         if CreateQuestLogCollapseConfigPanel then
             local configPanel = CreateQuestLogCollapseConfigPanel()
@@ -223,10 +320,18 @@ function SlashCmdList.QUESTLOGCOLLAPSE(msg)
             print("|cff00ff00QuestLogCollapse|r Configuration panel not available.")
         end
     elseif args[1] == "status" then
+        local profile = GetCurrentQLCProfile and GetCurrentQLCProfile() or QuestLogCollapseDB
         print("|cff00ff00QuestLogCollapse Status:|r")
-        print("Enabled: " .. (QuestLogCollapseDB.enabled and "Yes" or "No"))
-        print("Debug: " .. (QuestLogCollapseDB.debug and "Yes" or "No"))
-        print("In Dungeon: " .. (IsInDungeon() and "Yes" or "No"))
+        print("Enabled: " .. ((profile and profile.enabled) and "Yes" or "No"))
+        print("Debug: " .. ((profile and profile.debug) and "Yes" or "No"))
+        print("In Instance: " .. (IsInDungeon() and "Yes" or "No"))
+        
+        local settings = GetCurrentInstanceSettings and GetCurrentInstanceSettings()
+        if settings then
+            local instanceType = select(2, IsInInstance())
+            print("Current Instance Settings (" .. (instanceType or "none") .. "):")
+            print("  Instance Type Enabled: " .. (settings.enabled and "Yes" or "No"))
+        end
         
         print("|cff00ff00Current Section States:|r")
         if QuestObjectiveTracker then
@@ -246,7 +351,24 @@ function SlashCmdList.QUESTLOGCOLLAPSE(msg)
         print("|cff00ff00QuestLogCollapse|r manually collapsed configured sections")
     elseif args[1] == "expand" then
         ExpandQuestLog()
-        print("|cff00ff00QuestLogCollapse|r manually expanded configured sections")
+        print("|cff00ff00QuestLogCollapse|r manually expanded all collapsed sections")
+    elseif args[1] == "test" then
+        print("|cff00ff00QuestLogCollapse Test Results:|r")
+        print("QuestObjectiveTracker: " .. (QuestObjectiveTracker and "Found" or "Not found"))
+        print("AchievementObjectiveTracker: " .. (AchievementObjectiveTracker and "Found" or "Not found"))
+        print("BonusObjectiveTracker: " .. (BonusObjectiveTracker and "Found" or "Not found"))
+        print("ObjectiveTrackerFrame: " .. (ObjectiveTrackerFrame and "Found" or "Not found"))
+        if ObjectiveTrackerFrame and ObjectiveTrackerFrame.MODULES then
+            print("ObjectiveTrackerFrame.MODULES count: " .. #ObjectiveTrackerFrame.MODULES)
+        end
+        local inInstance, instanceType = IsInInstance()
+        print("In Instance: " .. tostring(inInstance) .. ", Type: " .. tostring(instanceType))
+        print("IsInDungeon(): " .. tostring(IsInDungeon()))
+        local settings = GetCurrentInstanceSettings and GetCurrentInstanceSettings()
+        print("Current Instance Settings: " .. (settings and "Found" or "Not found"))
+        if settings then
+            print("  Settings enabled: " .. tostring(settings.enabled))
+        end
     else
         print("|cff00ff00QuestLogCollapse|r Unknown command. Type |cffff0000/qlc help|r for available commands.")
     end
