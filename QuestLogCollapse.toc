@@ -1,0 +1,8 @@
+## Interface: 110002
+## Title: QuestLogCollapse
+## Notes: Automatically collapses the quest log when entering dungeons
+## Author: Gaspode
+## Version: 1.0.0
+## SavedVariables: QuestLogCollapseDB
+
+QuestLogCollapse.lua
