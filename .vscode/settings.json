@@ -29,7 +29,18 @@
         "AchievementObjectiveTracker",
         "MonthlyActivitiesObjectiveTracker",
         "ProfessionsRecipeTracker",
-        "BonusObjectiveTracker"
+        "BonusObjectiveTracker",
+        "StaticPopupDialogs",
+        "UIDropDownMenu_SetWidth",
+        "UIDropDownMenu_Initialize",
+        "UIDropDownMenu_SetSelectedValue",
+        "PanelTemplates_SetNumTabs",
+        "PanelTemplates_SetTab",
+        "Settings",
+        "StaticPopup_Show",
+        "UIDropDownMenu_AddButton",
+        "UIDropDownMenu_CreateInfo",
+        "SettingsPanel"
     ],
     "editor.fontFamily": "'FiraCode Nerd Font', 'Fira Code', monospace",
     "sync-rsync.exclude": [
