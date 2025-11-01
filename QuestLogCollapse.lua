@@ -7,6 +7,10 @@ QuestLogCollapse:RegisterEvent("ADDON_LOADED")
 QuestLogCollapse:RegisterEvent("ZONE_CHANGED_NEW_AREA")
 QuestLogCollapse:RegisterEvent("PLAYER_REGEN_DISABLED")
 QuestLogCollapse:RegisterEvent("PLAYER_REGEN_ENABLED")
+QuestLogCollapse:RegisterEvent("PLAYER_ENTERING_WORLD")
+
+-- Track loading state to prevent operations during initialization
+local isFullyLoaded = false
 
 -- Default settings
 local defaults = {
@@ -41,7 +45,41 @@ local function IsInDungeon()
         instanceType == "arena"
 end
 
+-- Safe function to collapse a tracker with error handling
+local function SafeCollapseTracker(tracker, name, shouldCollapse)
+    if not isFullyLoaded or not tracker or not shouldCollapse then
+        return false
+    end
+    
+    -- Don't manipulate trackers during combat to avoid taint
+    if InCombatLockdown() then
+        DebugPrint("Skipping " .. name .. " collapse - in combat")
+        return false
+    end
+    
+    -- Use pcall to catch any protected function errors
+    local success, err = pcall(function()
+        if tracker.SetCollapsed then
+            tracker:SetCollapsed(true)
+        end
+    end)
+    
+    if success then
+        DebugPrint(name .. " section collapsed")
+        return true
+    else
+        DebugPrint("Failed to collapse " .. name .. ": " .. tostring(err))
+        return false
+    end
+end
+
 local function CollapseQuestLog()
+    -- Don't do anything during combat to avoid taint
+    if InCombatLockdown() then
+        DebugPrint("CollapseQuestLog() skipped - in combat")
+        return
+    end
+    
     -- Get instance-specific settings from config system
     local settings = GetCurrentInstanceSettings and GetCurrentInstanceSettings()
 
@@ -60,185 +98,174 @@ local function CollapseQuestLog()
     DebugPrint("Instance settings found and enabled, proceeding with collapse")
     local collapsed = 0
 
-    if settings.collapseQuests and QuestObjectiveTracker then
-        QuestObjectiveTracker:SetCollapsed(true)
-        DebugPrint("Quest section collapsed")
+    -- Use safe collapse function for all trackers
+    if SafeCollapseTracker(QuestObjectiveTracker, "Quest", settings.collapseQuests) then
         collapsed = collapsed + 1
     end
 
-    if settings.collapseAchievements and AchievementObjectiveTracker then
-        AchievementObjectiveTracker:SetCollapsed(true)
-        DebugPrint("Achievement section collapsed")
+    if SafeCollapseTracker(AchievementObjectiveTracker, "Achievement", settings.collapseAchievements) then
         collapsed = collapsed + 1
     end
 
-    if settings.collapseBonusObjectives and BonusObjectiveTracker then
-        BonusObjectiveTracker:SetCollapsed(true)
-        DebugPrint("Bonus objectives section collapsed")
+    if SafeCollapseTracker(BonusObjectiveTracker, "Bonus objectives", settings.collapseBonusObjectives) then
         collapsed = collapsed + 1
     end
 
-    if settings.collapseScenarios and ScenarioObjectiveTracker then
-        ScenarioObjectiveTracker:SetCollapsed(true)
-        DebugPrint("Scenario section collapsed")
+    if SafeCollapseTracker(ScenarioObjectiveTracker, "Scenario", settings.collapseScenarios) then
         collapsed = collapsed + 1
     end
 
-    if settings.collapseCampaigns and CampaignQuestObjectiveTracker then
-        CampaignQuestObjectiveTracker:SetCollapsed(true)
-        DebugPrint("Campaign section collapsed")
+    if SafeCollapseTracker(CampaignQuestObjectiveTracker, "Campaign", settings.collapseCampaigns) then
         collapsed = collapsed + 1
     end
 
-    if settings.collapseProfessions and ProfessionsRecipeTracker then
-        ProfessionsRecipeTracker:SetCollapsed(true)
-        DebugPrint("Professions section collapsed")
+    if SafeCollapseTracker(ProfessionsRecipeTracker, "Professions", settings.collapseProfessions) then
         collapsed = collapsed + 1
     end
 
-    if settings.collapseMonthlyActivities and MonthlyActivitiesObjectiveTracker then
-        MonthlyActivitiesObjectiveTracker:SetCollapsed(true)
-        DebugPrint("Monthly activities section collapsed")
+    if SafeCollapseTracker(MonthlyActivitiesObjectiveTracker, "Monthly activities", settings.collapseMonthlyActivities) then
         collapsed = collapsed + 1
     end
 
-    if settings.collapseUIWidgets and UIWidgetObjectiveTracker then
-        UIWidgetObjectiveTracker:SetCollapsed(true)
-        DebugPrint("UI widgets section collapsed")
+    if SafeCollapseTracker(UIWidgetObjectiveTracker, "UI widgets", settings.collapseUIWidgets) then
         collapsed = collapsed + 1
     end
 
-    if settings.collapseAdventureMaps and AdventureMapQuestObjectiveTracker then
-        AdventureMapQuestObjectiveTracker:SetCollapsed(true)
-        DebugPrint("Adventure map section collapsed")
+    if SafeCollapseTracker(_G["AdventureMapQuestObjectiveTracker"], "Adventure map", settings.collapseAdventureMaps) then
         collapsed = collapsed + 1
     end
 
-    if settings.collapseWorldQuests and WorldQuestObjectiveTracker then
-        WorldQuestObjectiveTracker:SetCollapsed(true)
-        DebugPrint("World quest section collapsed")
+    if SafeCollapseTracker(WorldQuestObjectiveTracker, "World quest", settings.collapseWorldQuests) then
         collapsed = collapsed + 1
     end
 
     DebugPrint("Collapsed " .. collapsed .. " sections")
-    -- Handle nameplate settings
-    if settings.namePlates and settings.namePlates.enabled then
+    
+    -- Handle nameplate settings (only if not in combat)
+    if settings.namePlates and settings.namePlates.enabled and not InCombatLockdown() then
         DebugPrint("Enabling nameplates for instance")
         SetCVar("nameplateShowAll", 1)
     end
 end
 
+-- Safe function to expand a tracker with error handling
+local function SafeExpandTracker(tracker, name)
+    if not isFullyLoaded or not tracker then
+        DebugPrint(name .. " not found or not fully loaded")
+        return false
+    end
+    
+    -- Don't manipulate trackers during combat to avoid taint
+    if InCombatLockdown() then
+        DebugPrint("Skipping " .. name .. " expand - in combat")
+        return false
+    end
+    
+    -- Use pcall to catch any protected function errors
+    local success, err = pcall(function()
+        if tracker.SetCollapsed then
+            tracker:SetCollapsed(false)
+        end
+    end)
+    
+    if success then
+        DebugPrint(name .. " section expanded")
+        return true
+    else
+        DebugPrint("Failed to expand " .. name .. ": " .. tostring(err))
+        return false
+    end
+end
+
 local function ExpandQuestLog()
+    -- Don't do anything during combat to avoid taint
+    if InCombatLockdown() then
+        DebugPrint("ExpandQuestLog() skipped - in combat")
+        return
+    end
+    
     -- When leaving an instance, expand all sections regardless of settings
     -- This ensures we restore the original state
 
     DebugPrint("ExpandQuestLog() called")
     local expanded = 0
 
-    if QuestObjectiveTracker then
-        QuestObjectiveTracker:SetCollapsed(false)
-        DebugPrint("Quest section expanded")
+    -- Use safe expand function for all trackers
+    if SafeExpandTracker(QuestObjectiveTracker, "Quest") then
         expanded = expanded + 1
-    else
-        DebugPrint("QuestObjectiveTracker not found")
     end
 
-    if AchievementObjectiveTracker then
-        AchievementObjectiveTracker:SetCollapsed(false)
-        DebugPrint("Achievement section expanded")
+    if SafeExpandTracker(AchievementObjectiveTracker, "Achievement") then
         expanded = expanded + 1
-    else
-        DebugPrint("AchievementObjectiveTracker not found")
     end
 
-    if BonusObjectiveTracker then
-        BonusObjectiveTracker:SetCollapsed(false)
-        DebugPrint("Bonus objectives section expanded")
+    if SafeExpandTracker(BonusObjectiveTracker, "Bonus objectives") then
         expanded = expanded + 1
-    else
-        DebugPrint("BonusObjectiveTracker not found")
     end
 
-    if ScenarioObjectiveTracker then
-        ScenarioObjectiveTracker:SetCollapsed(false)
-        DebugPrint("Scenario section expanded")
+    if SafeExpandTracker(ScenarioObjectiveTracker, "Scenario") then
         expanded = expanded + 1
-    else
-        DebugPrint("ScenarioObjectiveTracker not found")
     end
 
-    if CampaignQuestObjectiveTracker then
-        CampaignQuestObjectiveTracker:SetCollapsed(false)
-        DebugPrint("Campaign section expanded")
+    if SafeExpandTracker(CampaignQuestObjectiveTracker, "Campaign") then
         expanded = expanded + 1
-    else
-        DebugPrint("CampaignQuestObjectiveTracker not found")
     end
 
-    if ProfessionsRecipeTracker then
-        ProfessionsRecipeTracker:SetCollapsed(false)
-        DebugPrint("Professions section expanded")
+    if SafeExpandTracker(ProfessionsRecipeTracker, "Professions") then
         expanded = expanded + 1
-    else
-        DebugPrint("ProfessionsRecipeTracker not found")
     end
 
-    if MonthlyActivitiesObjectiveTracker then
-        MonthlyActivitiesObjectiveTracker:SetCollapsed(false)
-        DebugPrint("Monthly activities section expanded")
+    if SafeExpandTracker(MonthlyActivitiesObjectiveTracker, "Monthly activities") then
         expanded = expanded + 1
-    else
-        DebugPrint("MonthlyActivitiesObjectiveTracker not found")
     end
 
-    if UIWidgetObjectiveTracker then
-        UIWidgetObjectiveTracker:SetCollapsed(false)
-        DebugPrint("UI widgets section expanded")
+    if SafeExpandTracker(UIWidgetObjectiveTracker, "UI widgets") then
         expanded = expanded + 1
-    else
-        DebugPrint("UIWidgetObjectiveTracker not found")
     end
-    if AdventureMapQuestObjectiveTracker then
-        AdventureMapQuestObjectiveTracker:SetCollapsed(false)
-        DebugPrint("Adventure map section expanded")
+
+    if SafeExpandTracker(_G["AdventureMapQuestObjectiveTracker"], "Adventure map") then
         expanded = expanded + 1
-    else
-        DebugPrint("AdventureMapQuestObjectiveTracker not found")
     end
-    if WorldQuestObjectiveTracker then
-        WorldQuestObjectiveTracker:SetCollapsed(false)
-        DebugPrint("World quest section expanded")
+
+    if SafeExpandTracker(WorldQuestObjectiveTracker, "World quest") then
         expanded = expanded + 1
-    else
-        DebugPrint("WorldQuestObjectiveTracker not found")
     end
 
     -- Try alternative method for the entire ObjectiveTrackerFrame
-    if ObjectiveTrackerFrame then
-        if ObjectiveTrackerFrame.SetCollapsed then
-            ObjectiveTrackerFrame:SetCollapsed(false)
-            DebugPrint("ObjectiveTrackerFrame expanded")
-            expanded = expanded + 1
-        end
+    if ObjectiveTrackerFrame and not InCombatLockdown() then
+        local success, err = pcall(function()
+            if ObjectiveTrackerFrame.SetCollapsed then
+                ObjectiveTrackerFrame:SetCollapsed(false)
+                DebugPrint("ObjectiveTrackerFrame expanded")
+                expanded = expanded + 1
+            end
 
-        -- Also try expanding all modules
-        if ObjectiveTrackerFrame.MODULES then
-            for i, module in ipairs(ObjectiveTrackerFrame.MODULES) do
-                if module and module.SetCollapsed then
-                    module:SetCollapsed(false)
-                    DebugPrint("Module " .. i .. " expanded")
-                    expanded = expanded + 1
+            -- Also try expanding all modules
+            if ObjectiveTrackerFrame.MODULES then
+                for i, module in ipairs(ObjectiveTrackerFrame.MODULES) do
+                    if module and module.SetCollapsed then
+                        module:SetCollapsed(false)
+                        DebugPrint("Module " .. i .. " expanded")
+                        expanded = expanded + 1
+                    end
                 end
             end
+        end)
+        
+        if not success then
+            DebugPrint("Failed to expand ObjectiveTrackerFrame: " .. tostring(err))
         end
     else
-        DebugPrint("ObjectiveTrackerFrame not found")
+        DebugPrint("ObjectiveTrackerFrame not found or in combat")
     end
 
     DebugPrint("Expanded " .. expanded .. " sections/modules")
-    -- Restore nameplate settings
-    DebugPrint("Disabling nameplates after leaving instance")
-    SetCVar("nameplateShowAll", 0)
+    
+    -- Restore nameplate settings (only if not in combat)
+    if not InCombatLockdown() then
+        DebugPrint("Disabling nameplates after leaving instance")
+        SetCVar("nameplateShowAll", 0)
+    end
 end
 
 local function OnZoneChanged()
@@ -250,8 +277,15 @@ local function OnZoneChanged()
 
     DebugPrint("Zone change detected, checking instance status...")
 
-    -- Add a small delay to ensure accurate instance detection
-    C_Timer.After(0.5, function()
+    -- Add a longer delay to ensure accurate instance detection and avoid conflicts
+    -- with Blizzard's map system initialization
+    C_Timer.After(1.5, function()
+        -- Double-check that we're not in combat before proceeding
+        if InCombatLockdown() then
+            DebugPrint("Skipping zone change handling - in combat")
+            return
+        end
+        
         local inInstance, instanceType = IsInInstance()
         DebugPrint("Instance check: inInstance=" .. tostring(inInstance) .. ", type=" .. tostring(instanceType))
 
@@ -279,13 +313,16 @@ local function OnAddonLoaded(addonName)
 
     print("|cff00ff00QuestLogCollapse|r v1.0.0 loaded. Type |cffff0000/qlc config|r for options.")
 
-    -- Check initial state
-    if IsInDungeon() then
-        local profile = GetCurrentQLCProfile and GetCurrentQLCProfile() or QuestLogCollapseDB
-        if profile and profile.enabled then
-            CollapseQuestLog()
+    -- Check initial state with a delay to avoid conflicts during addon loading
+    C_Timer.After(2.0, function()
+        if IsInDungeon() then
+            local profile = GetCurrentQLCProfile and GetCurrentQLCProfile() or QuestLogCollapseDB
+            if profile and profile.enabled and not InCombatLockdown() then
+                DebugPrint("Initial state check: in dungeon, applying collapse")
+                CollapseQuestLog()
+            end
         end
-    end
+    end)
 end
 
 local function OnCombatStateChanged(event)
@@ -294,15 +331,26 @@ local function OnCombatStateChanged(event)
         DebugPrint("Addon disabled or no profile found")
         return
     end
-    -- make sure we're not in a dungeon to avoid conflicts
+    
+    -- Make sure we're not in a dungeon to avoid conflicts
     if not IsInDungeon() then
         if event == "PLAYER_REGEN_DISABLED" then
             DebugPrint("Entering combat - checking status for collapse")
-
-            CollapseQuestLog()
+            -- Don't collapse during combat transition to avoid taint
+            -- Instead, wait a moment for the combat state to stabilize
+            C_Timer.After(0.1, function()
+                if not InCombatLockdown() then
+                    CollapseQuestLog()
+                else
+                    DebugPrint("Still in combat, skipping collapse")
+                end
+            end)
         elseif event == "PLAYER_REGEN_ENABLED" then
             DebugPrint("Leaving combat - checking status for expand")
-            ExpandQuestLog()
+            -- Safe to expand immediately after leaving combat
+            C_Timer.After(0.1, function()
+                ExpandQuestLog()
+            end)
         end
     end
 end
@@ -310,6 +358,10 @@ end
 QuestLogCollapse:SetScript("OnEvent", function(self, event, ...)
     if event == "ADDON_LOADED" then
         OnAddonLoaded(...)
+    elseif event == "PLAYER_ENTERING_WORLD" then
+        -- Mark as fully loaded after player enters world
+        isFullyLoaded = true
+        DebugPrint("Player entered world - addon fully loaded")
     elseif event == "ZONE_CHANGED_NEW_AREA" then
         OnZoneChanged()
     elseif event == "PLAYER_REGEN_DISABLED" or event == "PLAYER_REGEN_ENABLED" then
@@ -362,8 +414,11 @@ function SlashCmdList.QUESTLOGCOLLAPSE(msg)
                 end
                 Settings.OpenToCategory(configPanel.categoryID)
             elseif InterfaceOptionsFrame_OpenToCategory and configPanel then
-                -- Fallback to old interface options
-                InterfaceOptions_AddCategory(configPanel)
+                -- Fallback to old interface options (check if function exists in global table)
+                local addCategoryFunc = _G["InterfaceOptions_AddCategory"]
+                if addCategoryFunc then
+                    addCategoryFunc(configPanel)
+                end
                 InterfaceOptionsFrame_OpenToCategory(configPanel)
                 InterfaceOptionsFrame_OpenToCategory(configPanel) -- Called twice for proper display
             else
