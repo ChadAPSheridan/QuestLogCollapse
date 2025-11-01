@@ -1,5 +1,5 @@
 -- QuestLogCollapse Configuration Panel
--- Author: YourName
+-- Author: Gaspode
 -- Version: 1.0.0
 
 local QLC = QuestLogCollapseDB or {}
@@ -9,6 +9,19 @@ local defaults = {
     enabled = true,
     debug = false,
     -- Instance type settings
+    combat = {
+        enabled = false,
+        collapseQuests = false,
+        collapseAchievements = false,
+        collapseBonusObjectives = false,
+        collapseScenarios = false,
+        collapseCampaigns = false,
+        collapseProfessions = false,
+        collapseMonthlyActivities = false,
+        collapseUIWidgets = false,
+        collapseAdventureMaps = false,
+        namePlates = { enabled = false }
+    },
     dungeons = {
         enabled = true,
         collapseQuests = true,
@@ -19,7 +32,8 @@ local defaults = {
         collapseProfessions = false,
         collapseMonthlyActivities = false,
         collapseUIWidgets = false,
-        collapseAdventureMaps = false
+        collapseAdventureMaps = false,
+        namePlates = { enabled = false }
     },
     raids = {
         enabled = true,
@@ -31,7 +45,8 @@ local defaults = {
         collapseProfessions = false,
         collapseMonthlyActivities = false,
         collapseUIWidgets = false,
-        collapseAdventureMaps = false
+        collapseAdventureMaps = false,
+        namePlates = { enabled = false }
     },
     scenarios = {
         enabled = false,
@@ -43,7 +58,8 @@ local defaults = {
         collapseProfessions = false,
         collapseMonthlyActivities = false,
         collapseUIWidgets = false,
-        collapseAdventureMaps = false
+        collapseAdventureMaps = false,
+        namePlates = { enabled = false }
     },
     battlegrounds = {
         enabled = false,
@@ -55,7 +71,8 @@ local defaults = {
         collapseProfessions = false,
         collapseMonthlyActivities = false,
         collapseUIWidgets = false,
-        collapseAdventureMaps = false
+        collapseAdventureMaps = false,
+        namePlates = { enabled = false }
     },
     arenas = {
         enabled = false,
@@ -67,7 +84,8 @@ local defaults = {
         collapseProfessions = false,
         collapseMonthlyActivities = false,
         collapseUIWidgets = false,
-        collapseAdventureMaps = false
+        collapseAdventureMaps = false,
+        namePlates = { enabled = false }
     }
 }
 
@@ -158,38 +176,35 @@ local panel
 
 function CreateQuestLogCollapseConfigPanel()
     if panel then return panel end
-    
-    panel = CreateFrame("Frame", "QuestLogCollapseConfigPanel", UIParent)
+
+    panel = CreateFrame("Frame", "QuestLogCollapseConfigPanel", UIParent, "BackdropTemplate")
     panel.name = "QuestLogCollapse"
 
-    -- Main container
-    local mainContainer = CreateFrame("Frame", nil, panel, "BackdropTemplate")
-    mainContainer:SetSize(650, 600)
-    mainContainer:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, 0)
-    mainContainer:SetBackdrop({
-        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        edgeSize = 16,
-        insets = { left = 4, right = 4, top = 4, bottom = 4 }
-    })
-    mainContainer:SetBackdropColor(0, 0, 0, 0.3)
-    mainContainer:SetBackdropBorderColor(0.6, 0.6, 0.6, 0.8)
-
-    -- Title
-    local title = mainContainer:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", mainContainer, "TOP", 0, -20)
+    -- Title (stays fixed at top)
+    local title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    title:SetPoint("TOP", panel, "TOP", 0, -20)
     title:SetText("QuestLogCollapse Configuration")
 
+    -- Create scroll frame
+    local scrollFrame = CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, -50)
+    scrollFrame:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -25, 0)
+
+    -- Create scroll child (content frame)
+    local scrollChild = CreateFrame("Frame", nil, scrollFrame)
+    scrollChild:SetSize(600, 700) -- Adjusted height to fit all 6 instance containers + padding
+    scrollFrame:SetScrollChild(scrollChild)
+
     -- Profile section
-    local profileLabel = mainContainer:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    profileLabel:SetPoint("TOPLEFT", mainContainer, "TOPLEFT", 20, -60)
+    local profileLabel = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    profileLabel:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, -10)
     profileLabel:SetText("Profile:")
 
-    local profileDD = CreateFrame("Frame", nil, mainContainer, "UIDropDownMenuTemplate")
+    local profileDD = CreateFrame("Frame", nil, scrollChild, "UIDropDownMenuTemplate")
     profileDD:SetPoint("LEFT", profileLabel, "RIGHT", 10, 0)
     UIDropDownMenu_SetWidth(profileDD, 150)
 
-    local newProfileBtn = CreateFrame("Button", nil, mainContainer, "UIPanelButtonTemplate")
+    local newProfileBtn = CreateFrame("Button", nil, scrollChild, "UIPanelButtonTemplate")
     newProfileBtn:SetSize(100, 22)
     newProfileBtn:SetPoint("LEFT", profileDD, "RIGHT", 10, 0)
     newProfileBtn:SetText("New Profile")
@@ -198,30 +213,31 @@ function CreateQuestLogCollapseConfigPanel()
     end)
 
     -- Global settings
-    local enabledCheck = CreateFrame("CheckButton", nil, mainContainer, "InterfaceOptionsCheckButtonTemplate")
+    local enabledCheck = CreateFrame("CheckButton", nil, scrollChild, "InterfaceOptionsCheckButtonTemplate")
     enabledCheck:SetPoint("TOPLEFT", profileLabel, "BOTTOMLEFT", 0, -30)
     enabledCheck.Text:SetText("Enable QuestLogCollapse")
 
-    local debugCheck = CreateFrame("CheckButton", nil, mainContainer, "InterfaceOptionsCheckButtonTemplate")
+    local debugCheck = CreateFrame("CheckButton", nil, scrollChild, "InterfaceOptionsCheckButtonTemplate")
     debugCheck:SetPoint("LEFT", enabledCheck, "RIGHT", 200, 0)
     debugCheck.Text:SetText("Debug Mode")
 
-    -- Instance type containers
+    -- type containers
     local instanceTypes = {
-        { key = "dungeons", name = "Dungeons", color = "|cff00ff00" },
-        { key = "raids", name = "Raids", color = "|cffff8000" },
-        { key = "scenarios", name = "Scenarios", color = "|cff0080ff" },
+        { key = "combat",        name = "Combat",        color = "|cffffff00" },
+        { key = "dungeons",      name = "Dungeons",      color = "|cff00ff00" },
+        { key = "raids",         name = "Raids",         color = "|cffff8000" },
+        { key = "scenarios",     name = "Scenarios",     color = "|cff0080ff" },
         { key = "battlegrounds", name = "Battlegrounds", color = "|cffff0080" },
-        { key = "arenas", name = "Arenas", color = "|cff8000ff" }
+        { key = "arenas",        name = "Arenas",        color = "|cff8000ff" }
     }
 
     local instanceContainers = {}
-    local yOffset = -130
+    local yOffset = -80
 
     for i, instanceInfo in ipairs(instanceTypes) do
-        local container = CreateFrame("Frame", nil, mainContainer, "BackdropTemplate")
+        local container = CreateFrame("Frame", nil, scrollChild, "BackdropTemplate")
         container:SetSize(620, 85)
-        container:SetPoint("TOPLEFT", mainContainer, "TOPLEFT", 20, yOffset)
+        container:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", -5, yOffset)
         container:SetBackdrop({
             bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
             edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -235,34 +251,40 @@ function CreateQuestLogCollapseConfigPanel()
 
         -- Instance type label and enable checkbox
         local typeLabel = container:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-        typeLabel:SetPoint("TOPLEFT", container, "TOPLEFT", 15, -10)
+        typeLabel:SetPoint("TOPLEFT", container, "TOPLEFT", 5, -10)
         typeLabel:SetText(instanceInfo.color .. instanceInfo.name .. "|r")
 
         local typeEnabledCheck = CreateFrame("CheckButton", nil, container, "InterfaceOptionsCheckButtonTemplate")
-        typeEnabledCheck:SetPoint("LEFT", typeLabel, "RIGHT", 20, 0)
+        typeEnabledCheck:SetPoint("TOPLEFT", container, "TOPLEFT", 125, -10)
         typeEnabledCheck.Text:SetText("Enabled")
         typeEnabledCheck.key = instanceInfo.key
 
+        local namePlatesEnabledCheck = CreateFrame("CheckButton", nil, container, "InterfaceOptionsCheckButtonTemplate")
+        namePlatesEnabledCheck:SetPoint("TOPLEFT", container, "TOPLEFT", 245, -10)
+        namePlatesEnabledCheck.Text:SetText("Show Enemy Name Plates")
+        namePlatesEnabledCheck.key = instanceInfo.key
+
         -- Section checkboxes
         local sections = {
-            { key = "collapseQuests", name = "Quests" },
-            { key = "collapseAchievements", name = "Achievements" },
+            { key = "collapseQuests",          name = "Quests" },
+            { key = "collapseAchievements",    name = "Achievements" },
             { key = "collapseBonusObjectives", name = "Bonus" },
-            { key = "collapseScenarios", name = "Scenarios" },
-            { key = "collapseCampaigns", name = "Campaigns" }
+            { key = "collapseCampaigns",       name = "Campaigns" },
+            { key = "collapseScenarios",       name = "Scenario/Dungeon" }
         }
 
         local sections2 = {
-            { key = "collapseProfessions", name = "Professions" },
+            { key = "collapseWorldQuests",       name = "World" },
+            { key = "collapseProfessions",       name = "Professions" },
             { key = "collapseMonthlyActivities", name = "Monthly" },
-            { key = "collapseUIWidgets", name = "Widgets" },
-            { key = "collapseAdventureMaps", name = "Adventure" }
+            { key = "collapseUIWidgets",         name = "Widgets" },
+            { key = "collapseAdventureMaps",     name = "Adventure" }
         }
 
         -- First row of checkboxes
         for j, section in ipairs(sections) do
             local sectionCheck = CreateFrame("CheckButton", nil, container, "InterfaceOptionsCheckButtonTemplate")
-            sectionCheck:SetPoint("TOPLEFT", container, "TOPLEFT", 15 + (j-1) * 120, -35)
+            sectionCheck:SetPoint("TOPLEFT", container, "TOPLEFT", 5 + (j - 1) * 120, -35)
             sectionCheck.Text:SetText(section.name)
             sectionCheck.instanceKey = instanceInfo.key
             sectionCheck.sectionKey = section.key
@@ -276,7 +298,7 @@ function CreateQuestLogCollapseConfigPanel()
         -- Second row of checkboxes
         for j, section in ipairs(sections2) do
             local sectionCheck = CreateFrame("CheckButton", nil, container, "InterfaceOptionsCheckButtonTemplate")
-            sectionCheck:SetPoint("TOPLEFT", container, "TOPLEFT", 15 + (j-1) * 120, -55)
+            sectionCheck:SetPoint("TOPLEFT", container, "TOPLEFT", 5 + (j - 1) * 120, -55)
             sectionCheck.Text:SetText(section.name)
             sectionCheck.instanceKey = instanceInfo.key
             sectionCheck.sectionKey = section.key
@@ -288,9 +310,17 @@ function CreateQuestLogCollapseConfigPanel()
         end
 
         container.enabledCheck = typeEnabledCheck
+        container.namePlatesEnabledCheck = namePlatesEnabledCheck
+
         typeEnabledCheck:SetScript("OnClick", function(self)
             local prof = getProfile()
             prof[self.key].enabled = self:GetChecked()
+        end)
+
+        namePlatesEnabledCheck:SetScript("OnClick", function(self)
+            local prof = getProfile()
+            if not prof[self.key].namePlates then prof[self.key].namePlates = {} end
+            prof[self.key].namePlates.enabled = self:GetChecked()
         end)
 
         yOffset = yOffset - 90
@@ -304,7 +334,7 @@ function CreateQuestLogCollapseConfigPanel()
         local items = {}
         for k in pairs(QuestLogCollapseDB.profiles) do table.insert(items, k) end
         table.sort(items)
-        
+
         UIDropDownMenu_Initialize(profileDD, function(self, level)
             for _, name in ipairs(items) do
                 local info = UIDropDownMenu_CreateInfo()
@@ -319,37 +349,44 @@ function CreateQuestLogCollapseConfigPanel()
         end)
         UIDropDownMenu_SetSelectedValue(profileDD, QuestLogCollapseCharDB.currentProfile)
     end
+
     _G.RefreshQLCProfileDropdown = RefreshQLCProfileDropdown
 
     -- Update panel on show
     panel.OnShow = function()
         local prof = getProfile()
-        
+
         -- Update global settings
         enabledCheck:SetChecked(prof.enabled)
         debugCheck:SetChecked(prof.debug)
-        
+
         -- Update instance type settings
         for _, instanceInfo in ipairs(instanceTypes) do
             local container = instanceContainers[instanceInfo.key]
             local instanceSettings = prof[instanceInfo.key]
-            
+
             container.enabledCheck:SetChecked(instanceSettings.enabled)
-            
+
+            -- Update nameplate settings
+            if container.namePlatesEnabledCheck then
+                local namePlateEnabled = instanceSettings.namePlates and instanceSettings.namePlates.enabled or false
+                container.namePlatesEnabledCheck:SetChecked(namePlateEnabled)
+            end
+
             -- Update section checkboxes
             local allSections = {
                 "collapseQuests", "collapseAchievements", "collapseBonusObjectives",
                 "collapseScenarios", "collapseCampaigns", "collapseProfessions",
                 "collapseMonthlyActivities", "collapseUIWidgets", "collapseAdventureMaps"
             }
-            
+
             for _, sectionKey in ipairs(allSections) do
                 if container[sectionKey] then
                     container[sectionKey]:SetChecked(instanceSettings[sectionKey])
                 end
             end
         end
-        
+
         RefreshQLCProfileDropdown()
     end
 
@@ -383,17 +420,17 @@ configEventFrame:SetScript("OnEvent", function(self, event, addonName)
         if not panelRegistered then
             -- Register the panel in the options menu
             local configPanel = CreateQuestLogCollapseConfigPanel()
-            
+
             -- Register with the new settings system (WoW 10.0+)
             if Settings and Settings.RegisterAddOnCategory and Settings.RegisterCanvasLayoutCategory then
                 local category = Settings.RegisterCanvasLayoutCategory(configPanel, "QuestLogCollapse")
                 Settings.RegisterAddOnCategory(category)
                 configPanel.categoryID = category
-            -- Fallback to old interface options (pre-10.0)
+                -- Fallback to old interface options (pre-10.0)
             elseif InterfaceOptions_AddCategory then
                 InterfaceOptions_AddCategory(configPanel)
             end
-            
+
             panelRegistered = true
         end
         self:UnregisterEvent("PLAYER_ENTERING_WORLD")
@@ -404,9 +441,9 @@ end)
 function GetCurrentInstanceSettings()
     local prof = getProfile()
     if not prof then return nil end
-    
+
     local instanceType = select(2, IsInInstance())
-    
+
     if instanceType == "party" then
         return prof.dungeons
     elseif instanceType == "raid" then
@@ -417,8 +454,10 @@ function GetCurrentInstanceSettings()
         return prof.battlegrounds
     elseif instanceType == "arena" then
         return prof.arenas
+    else
+        return prof.combat
     end
-    
+
     return nil
 end
 
