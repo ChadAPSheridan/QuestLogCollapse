@@ -1,16 +1,20 @@
 # QuestLogCollapse
 
-A World of Warcraft addon that automatically collapses the quest log when entering dungeons or raids.
+A World of Warcraft addon that automatically collapses the quest log when entering dungeons, raids, or combat situations.
 
 ## Features
 
 - **Automatic Quest Log Management**: Automatically collapses quest log sections when entering instances and expands them when leaving
-- **Instance Type Configuration**: Different settings for dungeons, raids, scenarios, battlegrounds, and arenas
+- **Combat Collapse Support**: Collapses quest trackers during combat outside of instances (with smart queue system)
+- **Instance Type Configuration**: Different settings for dungeons, raids, scenarios, battlegrounds, arenas, and combat
 - **Individual Section Control**: Fine-grained control over which objective tracker sections to collapse (quests, achievements, bonus objectives, etc.)
 - **Character-Specific Profiles**: Settings saved per character with support for multiple profiles
 - **GUI Configuration**: Easy-to-use configuration panel accessible via `/qlc config`
+- **Combat Queue System**: Smart handling of operations during combat to prevent taint issues
+- **Nameplate Integration**: Optional nameplate management for different instance types
 - **Debug Mode**: Optional debug messages to track addon behavior
 - **Manual Control**: Commands to manually collapse/expand configured sections
+- **Error-Safe Operation**: Protected against addon taint with comprehensive error handling
 - **Lightweight**: Minimal performance impact with efficient event handling
 
 ## Installation
@@ -26,14 +30,20 @@ A World of Warcraft addon that automatically collapses the quest log when enteri
 
 The addon provides several slash commands for basic control:
 
-- `/qlc` or `/questlogcollapse` - Show help menu
+- `/qlc` or `/questlogcollapse` - Show help menu with combat behavior information
 - `/qlc config` - Open the configuration panel (recommended)
 - `/qlc toggle` - Enable/disable the addon
 - `/qlc debug` - Toggle debug messages on/off
-- `/qlc status` - Show current addon status and section states
-- `/qlc collapse` - Manually collapse configured sections
-- `/qlc expand` - Manually expand configured sections
+- `/qlc status` - Show current addon status, combat queue, and section states
+- `/qlc collapse` - Manually collapse configured sections (queued during combat)
+- `/qlc expand` - Manually expand configured sections (cancels combat queue)
+- `/qlc test` - Test objective tracker detection and combat queue status
 - `/qlc help` - Show all available commands
+
+### Combat Behavior
+- **Combat Queue System**: Operations during combat are automatically queued and applied when combat ends
+- **Smart Overrides**: Use `/qlc expand` during combat to cancel any queued collapse operations
+- **Instance Priority**: Combat settings are ignored when in dungeons/instances
 
 ## Configuration
 
@@ -46,6 +56,7 @@ The addon features a comprehensive configuration panel accessible via `/qlc conf
 
 ### Instance Type Settings
 Configure different behaviors for each type of instance:
+- **Combat**: Outside instances during combat situations
 - **Dungeons**: 5-player group content
 - **Raids**: Large group content  
 - **Scenarios**: Solo/small group story content
@@ -59,27 +70,43 @@ For each instance type, you can control which objective tracker sections get col
 - **Bonus Objectives**: World quest and bonus objectives
 - **Scenarios**: Scenario-specific objectives
 - **Campaigns**: Campaign quest lines
+- **World Quests**: World quest objectives
 - **Professions**: Profession recipe tracking
 - **Monthly Activities**: Monthly event tracking
 - **UI Widgets**: Special UI widget objectives
 - **Adventure Maps**: Adventure map objectives
+
+### Additional Options
+- **Nameplate Control**: Enable/disable enemy nameplates for each instance type
+- **Profile Management**: Create, switch, and manage multiple configuration profiles
 
 ## How It Works
 
 The addon uses the World of Warcraft API to:
 
 1. **Detect Zone Changes**: Listens to the `ZONE_CHANGED_NEW_AREA` event
-2. **Check Instance Type**: Uses `IsInInstance()` to determine if you're in a dungeon, raid, scenario, battleground, or arena
-3. **Apply Instance-Specific Settings**: Uses different configurations based on the type of instance you're in
-4. **Manage Individual Sections**: Controls specific ObjectiveTracker modules rather than the entire frame
+2. **Monitor Combat State**: Tracks `PLAYER_REGEN_DISABLED` and `PLAYER_REGEN_ENABLED` events
+3. **Check Instance Type**: Uses `IsInInstance()` to determine if you're in a dungeon, raid, scenario, battleground, or arena
+4. **Apply Instance-Specific Settings**: Uses different configurations based on the type of instance you're in
+5. **Smart Combat Handling**: Queues operations during combat and applies them safely when combat ends
+6. **Manage Individual Sections**: Controls specific ObjectiveTracker modules rather than the entire frame
    - `QuestObjectiveTracker` - Regular quests
    - `AchievementObjectiveTracker` - Achievements  
    - `BonusObjectiveTracker` - World quests and bonus objectives
    - `ScenarioObjectiveTracker` - Scenario objectives
    - `CampaignQuestObjectiveTracker` - Campaign quests
+   - `WorldQuestObjectiveTracker` - World quest objectives
    - `ProfessionsRecipeTracker` - Profession recipes
    - `MonthlyActivitiesObjectiveTracker` - Monthly activities
    - `UIWidgetObjectiveTracker` - UI widget objectives
+   - `AdventureMapQuestObjectiveTracker` - Adventure map objectives
+
+### Combat Queue System
+- **Taint Prevention**: Never manipulates objective trackers during combat to prevent addon taint
+- **Operation Queuing**: Queues collapse/expand operations when combat is detected
+- **Automatic Application**: Applies queued operations safely when combat ends
+- **Manual Overrides**: Allows manual cancellation of queued operations
+- **Instance Priority**: Combat operations are ignored when in instances to avoid conflicts
 
 ## Technical Details
 
@@ -93,7 +120,10 @@ QuestLogCollapse/
 
 ### Events Handled
 - `ADDON_LOADED` - Initialize settings when addon loads
+- `PLAYER_ENTERING_WORLD` - Mark addon as fully loaded and ready
 - `ZONE_CHANGED_NEW_AREA` - Detect when player changes zones/instances
+- `PLAYER_REGEN_DISABLED` - Handle entering combat (queue operations)
+- `PLAYER_REGEN_ENABLED` - Handle leaving combat (apply queued operations)
 
 ### Database Structure
 - `QuestLogCollapseDB` - Global settings and profiles
@@ -108,9 +138,10 @@ Settings are organized into profiles with the following structure:
 - `debug` (default: false) - Whether to show debug messages
 
 ### Instance Type Settings (per profile)
-Each instance type (dungeons, raids, scenarios, battlegrounds, arenas) has:
+Each instance type (combat, dungeons, raids, scenarios, battlegrounds, arenas) has:
 - `enabled` - Whether to process this instance type
 - Individual section collapse settings for each ObjectiveTracker module
+- `namePlates.enabled` - Whether to show enemy nameplates for this instance type
 
 ## Compatibility
 
@@ -127,6 +158,19 @@ Each instance type (dungeons, raids, scenarios, battlegrounds, arenas) has:
 4. Check that the specific sections you want collapsed are enabled for that instance type
 5. Enable debug mode to see what's happening: `/qlc debug`
 6. Try manually toggling: `/qlc collapse` or `/qlc expand`
+
+### Combat Operations Not Working
+1. Check if combat instance type is enabled: `/qlc config`
+2. Verify you're outside of instances (combat settings ignored in dungeons/raids)
+3. Check combat queue status: `/qlc status`
+4. Enable debug mode to see combat queue operations: `/qlc debug`
+5. Try manual commands to test: `/qlc collapse` during combat
+
+### Addon Taint Issues
+1. The addon now uses a combat queue system to prevent taint
+2. If you see "ADDON_ACTION_BLOCKED" errors, ensure you're using the latest version
+3. Operations during combat are queued and applied safely when combat ends
+4. Use `/qlc expand` during combat to cancel problematic queued operations
 
 ### Addon Not Loading
 1. Ensure files are in the correct directory
@@ -147,8 +191,10 @@ Each instance type (dungeons, raids, scenarios, battlegrounds, arenas) has:
 ### Debug Information
 Enable debug mode with `/qlc debug` to see detailed information about:
 - Zone changes and dungeon detection
+- Combat state changes and queue operations
 - Quest log state changes
 - Addon initialization
+- Error handling and protected function calls
 
 ## Contributing
 
@@ -161,8 +207,17 @@ This project is open source. Feel free to modify and distribute as needed.
 ## Changelog
 
 ### Version 1.0.0
-- Initial release
-- Automatic quest log collapse/expand based on dungeon entry/exit
-- Slash commands for configuration and manual control
-- Debug mode for troubleshooting
-- Saved settings per character
+- Initial release with comprehensive functionality
+- Automatic quest log collapse/expand based on instance entry/exit
+- Combat collapse support with smart queue system
+- Multiple instance type support (combat, dungeons, raids, scenarios, battlegrounds, arenas)
+- Individual objective tracker section control
+- Character-specific profile system
+- GUI configuration panel with scrollable interface
+- Nameplate integration for instance types
+- Combat queue system to prevent addon taint
+- Protected function error handling
+- Comprehensive slash command interface
+- Debug mode with detailed logging
+- Manual override capabilities
+- Settings migration and profile management
