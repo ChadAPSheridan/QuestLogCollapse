@@ -12,6 +12,13 @@ QuestLogCollapse:RegisterEvent("PLAYER_ENTERING_WORLD")
 -- Track loading state to prevent operations during initialization
 local isFullyLoaded = false
 
+-- Track combat state for delayed operations
+local combatStateQueue = {
+    shouldCollapseOnCombatEnd = false,
+    shouldExpandOnCombatEnd = false,
+    enteredCombatOutsideInstance = false
+}
+
 -- Default settings
 local defaults = {
     enabled = true,
@@ -51,7 +58,7 @@ local function SafeCollapseTracker(tracker, name, shouldCollapse)
         return false
     end
     
-    -- Don't manipulate trackers during combat to avoid taint
+    -- NEVER manipulate trackers during combat to avoid taint
     if InCombatLockdown() then
         DebugPrint("Skipping " .. name .. " collapse - in combat")
         return false
@@ -74,7 +81,7 @@ local function SafeCollapseTracker(tracker, name, shouldCollapse)
 end
 
 local function CollapseQuestLog()
-    -- Don't do anything during combat to avoid taint
+    -- NEVER do anything during combat to avoid taint
     if InCombatLockdown() then
         DebugPrint("CollapseQuestLog() skipped - in combat")
         return
@@ -155,7 +162,7 @@ local function SafeExpandTracker(tracker, name)
         return false
     end
     
-    -- Don't manipulate trackers during combat to avoid taint
+    -- NEVER manipulate trackers during combat to avoid taint
     if InCombatLockdown() then
         DebugPrint("Skipping " .. name .. " expand - in combat")
         return false
@@ -178,7 +185,7 @@ local function SafeExpandTracker(tracker, name)
 end
 
 local function ExpandQuestLog()
-    -- Don't do anything during combat to avoid taint
+    -- NEVER do anything during combat to avoid taint
     if InCombatLockdown() then
         DebugPrint("ExpandQuestLog() skipped - in combat")
         return
@@ -335,23 +342,29 @@ local function OnCombatStateChanged(event)
     -- Make sure we're not in a dungeon to avoid conflicts
     if not IsInDungeon() then
         if event == "PLAYER_REGEN_DISABLED" then
-            DebugPrint("Entering combat - checking status for collapse")
-            -- Don't collapse during combat transition to avoid taint
-            -- Instead, wait a moment for the combat state to stabilize
-            C_Timer.After(0.1, function()
-                if not InCombatLockdown() then
-                    CollapseQuestLog()
-                else
-                    DebugPrint("Still in combat, skipping collapse")
-                end
-            end)
+            DebugPrint("Entering combat outside instance - queueing collapse for when combat ends")
+            -- Queue the collapse operation for when combat ends
+            combatStateQueue.enteredCombatOutsideInstance = true
+            combatStateQueue.shouldCollapseOnCombatEnd = true
+            combatStateQueue.shouldExpandOnCombatEnd = false
         elseif event == "PLAYER_REGEN_ENABLED" then
-            DebugPrint("Leaving combat - checking status for expand")
-            -- Safe to expand immediately after leaving combat
-            C_Timer.After(0.1, function()
+            DebugPrint("Leaving combat - checking queued operations")
+            
+            if combatStateQueue.enteredCombatOutsideInstance and combatStateQueue.shouldCollapseOnCombatEnd then
+                DebugPrint("Applying queued collapse operation after combat")
+                CollapseQuestLog()
+                combatStateQueue.shouldCollapseOnCombatEnd = false
+            elseif combatStateQueue.shouldExpandOnCombatEnd then
+                DebugPrint("Applying queued expand operation after combat")
                 ExpandQuestLog()
-            end)
+                combatStateQueue.shouldExpandOnCombatEnd = false
+            end
+            
+            -- Reset combat tracking
+            combatStateQueue.enteredCombatOutsideInstance = false
         end
+    else
+        DebugPrint("In dungeon/instance - skipping combat state change handling")
     end
 end
 -- Event handler
@@ -384,11 +397,15 @@ function SlashCmdList.QUESTLOGCOLLAPSE(msg)
         print("|cff00ff00QuestLogCollapse Commands:|r")
         print("|cffff0000/qlc toggle|r - Toggle addon on/off")
         print("|cffff0000/qlc debug|r - Toggle debug messages")
-        print("|cffff0000/qlc status|r - Show current status")
+        print("|cffff0000/qlc status|r - Show current status and combat queue")
         print("|cffff0000/qlc collapse|r - Manually collapse configured sections")
         print("|cffff0000/qlc expand|r - Manually expand all collapsed sections")
         print("|cffff0000/qlc test|r - Test objective tracker detection")
         print("|cffff0000/qlc config|r - Open configuration panel")
+        print("")
+        print("|cff00ff00Combat Behavior:|r")
+        print("• Operations during combat are queued and applied when combat ends")
+        print("• Use |cffff0000/qlc expand|r during combat to cancel queued operations")
         print("Available sections: quests, achievements, bonus, scenarios,")
         print("campaigns, professions, monthly, widgets, adventuremaps")
     elseif args[1] == "toggle" then
@@ -434,6 +451,7 @@ function SlashCmdList.QUESTLOGCOLLAPSE(msg)
         print("Enabled: " .. ((profile and profile.enabled) and "Yes" or "No"))
         print("Debug: " .. ((profile and profile.debug) and "Yes" or "No"))
         print("In Instance: " .. (IsInDungeon() and "Yes" or "No"))
+        print("In Combat: " .. (InCombatLockdown() and "Yes" or "No"))
 
         local settings = GetCurrentInstanceSettings and GetCurrentInstanceSettings()
         if settings then
@@ -441,6 +459,11 @@ function SlashCmdList.QUESTLOGCOLLAPSE(msg)
             print("Current Instance Settings (" .. (instanceType or "none") .. "):")
             print("  Instance Type Enabled: " .. (settings.enabled and "Yes" or "No"))
         end
+
+        print("|cff00ff00Combat Queue Status:|r")
+        print("  Entered Combat Outside Instance: " .. (combatStateQueue.enteredCombatOutsideInstance and "Yes" or "No"))
+        print("  Collapse Queued: " .. (combatStateQueue.shouldCollapseOnCombatEnd and "Yes" or "No"))
+        print("  Expand Queued: " .. (combatStateQueue.shouldExpandOnCombatEnd and "Yes" or "No"))
 
         print("|cff00ff00Current Section States:|r")
         if QuestObjectiveTracker then
@@ -456,11 +479,27 @@ function SlashCmdList.QUESTLOGCOLLAPSE(msg)
             print("Scenarios: " .. (ScenarioObjectiveTracker.collapsed and "Collapsed" or "Expanded"))
         end
     elseif args[1] == "collapse" then
-        CollapseQuestLog()
-        print("|cff00ff00QuestLogCollapse|r manually collapsed configured sections")
+        if InCombatLockdown() then
+            print("|cff00ff00QuestLogCollapse|r Cannot collapse during combat - will apply when combat ends")
+            -- Queue the operation if we're outside dungeons
+            if not IsInDungeon() then
+                combatStateQueue.shouldCollapseOnCombatEnd = true
+                combatStateQueue.shouldExpandOnCombatEnd = false
+            end
+        else
+            CollapseQuestLog()
+            print("|cff00ff00QuestLogCollapse|r manually collapsed configured sections")
+        end
     elseif args[1] == "expand" then
-        ExpandQuestLog()
-        print("|cff00ff00QuestLogCollapse|r manually expanded all collapsed sections")
+        if InCombatLockdown() then
+            print("|cff00ff00QuestLogCollapse|r Cannot expand during combat - canceling any queued operations")
+            -- Cancel any queued operations and clear combat state
+            combatStateQueue.shouldCollapseOnCombatEnd = false
+            combatStateQueue.shouldExpandOnCombatEnd = true
+        else
+            ExpandQuestLog()
+            print("|cff00ff00QuestLogCollapse|r manually expanded all collapsed sections")
+        end
     elseif args[1] == "test" then
         print("|cff00ff00QuestLogCollapse Test Results:|r")
         print("QuestObjectiveTracker: " .. (QuestObjectiveTracker and "Found" or "Not found"))
@@ -478,6 +517,10 @@ function SlashCmdList.QUESTLOGCOLLAPSE(msg)
         if settings then
             print("  Settings enabled: " .. tostring(settings.enabled))
         end
+        print("|cff00ff00Combat Queue Status:|r")
+        print("  Entered Combat Outside Instance: " .. (combatStateQueue.enteredCombatOutsideInstance and "Yes" or "No"))
+        print("  Collapse Queued: " .. (combatStateQueue.shouldCollapseOnCombatEnd and "Yes" or "No"))
+        print("  Expand Queued: " .. (combatStateQueue.shouldExpandOnCombatEnd and "Yes" or "No"))
     else
         print("|cff00ff00QuestLogCollapse|r Unknown command. Type |cffff0000/qlc help|r for available commands.")
     end
