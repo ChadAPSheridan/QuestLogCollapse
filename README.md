@@ -2,7 +2,7 @@
 
 A World of Warcraft addon that automatically collapses the quest log when entering dungeons, raids, or combat situations.
 
-**Please Note: This addon does not work with client versions < 10.0
+**Please Note: This addon does not work with client versions < 10.0**
 
 ## Features
 
@@ -46,6 +46,7 @@ The addon provides several slash commands for basic control:
 ### Combat Behavior
 - **Early Combat Detection**: Quest trackers collapse via `PLAYER_ENTER_COMBAT` event (fires before taint protection)
 - **Fallback Collapse**: If early detection fails, attempts immediate collapse during `PLAYER_REGEN_DISABLED`
+- **Automatic Expansion**: Quest trackers automatically expand when combat ends (only if they were collapsed during combat)
 - **Queue System**: If immediate collapse fails due to taint protection, operations are queued for when combat ends
 - **Smart Overrides**: Use `/qlc expand` during combat to cancel any queued collapse operations
 - **Instance Priority**: Combat settings are ignored when in dungeons/instances
@@ -109,6 +110,8 @@ The addon uses the World of Warcraft API to:
 ### Combat Queue System
 - **Early Detection**: Uses `PLAYER_ENTER_COMBAT` event for earliest possible collapse (before taint protection)
 - **Dual-Layer Approach**: Fallback to `PLAYER_REGEN_DISABLED` if early detection fails or is incomplete
+- **Smart Expansion**: Tracks which trackers were collapsed during combat and only expands those on combat end
+- **State Preservation**: Maintains quest log state when combat collapse is disabled or no trackers were affected
 - **Taint Prevention**: If both immediate attempts fail, operations are safely queued to prevent addon taint
 - **Operation Queuing**: Queues collapse/expand operations when combat is detected
 - **Automatic Application**: Applies queued operations safely when combat ends
@@ -213,6 +216,13 @@ Feel free to submit issues, feature requests, or pull requests to improve this a
 This project is open source. Feel free to modify and distribute as needed.
 
 ## Changelog
+
+### Version 1.3.0
+- **Automatic Quest Log Expansion**: Quest trackers now automatically expand when combat ends (only if they were collapsed during combat)
+- **Smart State Tracking**: Added tracking to determine which trackers were collapsed during combat for intelligent restoration
+- **Enhanced Combat Flow**: Complete combat cycle - collapse on enter, expand on exit (outside instances)
+- **Improved State Management**: Better handling of combat state when collapse is disabled or no trackers are affected
+- **Enhanced Debug Information**: Added tracker collapse state to status and test commands
 
 ### Version 1.2.0
 - **Early Combat Detection**: Added `PLAYER_ENTER_COMBAT` event for earliest possible quest tracker collapse
