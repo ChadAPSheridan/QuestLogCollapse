@@ -421,15 +421,9 @@ configEventFrame:SetScript("OnEvent", function(self, event, addonName)
             -- Register the panel in the options menu
             local configPanel = CreateQuestLogCollapseConfigPanel()
 
-            -- Register with the new settings system (WoW 10.0+)
-            if Settings and Settings.RegisterAddOnCategory and Settings.RegisterCanvasLayoutCategory then
-                local category = Settings.RegisterCanvasLayoutCategory(configPanel, "QuestLogCollapse")
-                Settings.RegisterAddOnCategory(category)
-                configPanel.categoryID = category
-                -- Fallback to old interface options (pre-10.0)
-            elseif InterfaceOptions_AddCategory then
-                InterfaceOptions_AddCategory(configPanel)
-            end
+            local category = Settings.RegisterCanvasLayoutCategory(configPanel, "QuestLogCollapse")
+            Settings.RegisterAddOnCategory(category)
+            configPanel.categoryID = category
 
             panelRegistered = true
         end
