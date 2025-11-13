@@ -358,7 +358,6 @@ local function OnCombatStateChanged(event)
                 
                 -- Try to collapse immediately (before taint protection fully kicks in)
                 -- This is a backup in case PLAYER_ENTER_COMBAT didn't fire or failed
-                local success = false
                 local collapsed = 0
                 
                 -- Attempt immediate collapse of each enabled tracker
@@ -434,13 +433,12 @@ local function OnCombatStateChanged(event)
                 
                 if collapsed > 0 then
                     DebugPrint("Successfully collapsed " .. collapsed .. " trackers immediately in combat")
-                    success = true
                 else
                     DebugPrint("No trackers could be collapsed immediately - queuing for after combat")
                 end
                 
                 -- If immediate collapse failed or was incomplete, queue it for when combat ends
-                if not success or collapsed == 0 then
+                if collapsed == 0 then
                     combatStateQueue.enteredCombatOutsideInstance = true
                     combatStateQueue.shouldCollapseOnCombatEnd = true
                     combatStateQueue.shouldExpandOnCombatEnd = false

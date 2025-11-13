@@ -2,6 +2,8 @@
 
 A World of Warcraft addon that automatically collapses the quest log when entering dungeons, raids, or combat situations.
 
+**Please Note: This addon does not work with client versions < 10.0
+
 ## Features
 
 - **Automatic Quest Log Management**: Automatically collapses quest log sections when entering instances and expands them when leaving
