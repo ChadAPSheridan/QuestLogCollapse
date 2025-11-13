@@ -38,10 +38,13 @@ The addon provides several slash commands for basic control:
 - `/qlc collapse` - Manually collapse configured sections (queued during combat)
 - `/qlc expand` - Manually expand configured sections (cancels combat queue)
 - `/qlc test` - Test objective tracker detection and combat queue status
+- `/qlc testcombat` - Test combat settings and tracker availability
 - `/qlc help` - Show all available commands
 
 ### Combat Behavior
-- **Combat Queue System**: Operations during combat are automatically queued and applied when combat ends
+- **Early Combat Detection**: Quest trackers collapse via `PLAYER_ENTER_COMBAT` event (fires before taint protection)
+- **Fallback Collapse**: If early detection fails, attempts immediate collapse during `PLAYER_REGEN_DISABLED`
+- **Queue System**: If immediate collapse fails due to taint protection, operations are queued for when combat ends
 - **Smart Overrides**: Use `/qlc expand` during combat to cancel any queued collapse operations
 - **Instance Priority**: Combat settings are ignored when in dungeons/instances
 
@@ -102,7 +105,9 @@ The addon uses the World of Warcraft API to:
    - `AdventureMapQuestObjectiveTracker` - Adventure map objectives
 
 ### Combat Queue System
-- **Taint Prevention**: Never manipulates objective trackers during combat to prevent addon taint
+- **Early Detection**: Uses `PLAYER_ENTER_COMBAT` event for earliest possible collapse (before taint protection)
+- **Dual-Layer Approach**: Fallback to `PLAYER_REGEN_DISABLED` if early detection fails or is incomplete
+- **Taint Prevention**: If both immediate attempts fail, operations are safely queued to prevent addon taint
 - **Operation Queuing**: Queues collapse/expand operations when combat is detected
 - **Automatic Application**: Applies queued operations safely when combat ends
 - **Manual Overrides**: Allows manual cancellation of queued operations
@@ -122,7 +127,8 @@ QuestLogCollapse/
 - `ADDON_LOADED` - Initialize settings when addon loads
 - `PLAYER_ENTERING_WORLD` - Mark addon as fully loaded and ready
 - `ZONE_CHANGED_NEW_AREA` - Detect when player changes zones/instances
-- `PLAYER_REGEN_DISABLED` - Handle entering combat (queue operations)
+- `PLAYER_ENTER_COMBAT` - Early combat detection for immediate collapse (before taint protection)
+- `PLAYER_REGEN_DISABLED` - Handle entering combat (fallback immediate collapse or queue operations)
 - `PLAYER_REGEN_ENABLED` - Handle leaving combat (apply queued operations)
 
 ### Database Structure
@@ -205,6 +211,20 @@ Feel free to submit issues, feature requests, or pull requests to improve this a
 This project is open source. Feel free to modify and distribute as needed.
 
 ## Changelog
+
+### Version 1.2.0
+- **Early Combat Detection**: Added `PLAYER_ENTER_COMBAT` event for earliest possible quest tracker collapse
+- **Dual-Layer Combat System**: Early detection + fallback system for maximum reliability
+- **Improved Success Rate**: Better chance of collapsing trackers before taint protection activates
+- **Enhanced Debug Logging**: Better tracking of early vs. fallback combat detection
+- **Reduced Taint Risk**: Earlier event handling reduces reliance on protected functions during combat
+
+### Version 1.1.0
+- **Enhanced Combat Collapse**: Quest trackers now attempt immediate collapse when entering combat
+- **Improved Combat Handling**: Added fallback queuing system when immediate collapse fails due to taint protection
+- **New Test Command**: Added `/qlc testcombat` to test combat settings and tracker availability
+- **Better User Feedback**: Enhanced debug messages for immediate vs. queued combat operations
+- **World Quest Support**: Added world quest tracker support to immediate combat collapse
 
 ### Version 1.0.0
 - Initial release with comprehensive functionality

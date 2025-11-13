@@ -5,6 +5,7 @@
 local QuestLogCollapse = CreateFrame("Frame")
 QuestLogCollapse:RegisterEvent("ADDON_LOADED")
 QuestLogCollapse:RegisterEvent("ZONE_CHANGED_NEW_AREA")
+QuestLogCollapse:RegisterEvent("PLAYER_ENTER_COMBAT")
 QuestLogCollapse:RegisterEvent("PLAYER_REGEN_DISABLED")
 QuestLogCollapse:RegisterEvent("PLAYER_REGEN_ENABLED")
 QuestLogCollapse:RegisterEvent("PLAYER_ENTERING_WORLD")
@@ -342,11 +343,117 @@ local function OnCombatStateChanged(event)
     -- Make sure we're not in a dungeon to avoid conflicts
     if not IsInDungeon() then
         if event == "PLAYER_REGEN_DISABLED" then
-            DebugPrint("Entering combat outside instance - queueing collapse for when combat ends")
-            -- Queue the collapse operation for when combat ends
-            combatStateQueue.enteredCombatOutsideInstance = true
-            combatStateQueue.shouldCollapseOnCombatEnd = true
-            combatStateQueue.shouldExpandOnCombatEnd = false
+            -- Check if combat collapse is enabled
+            local settings = GetCurrentInstanceSettings and GetCurrentInstanceSettings()
+            if settings and settings.enabled then
+                DebugPrint("PLAYER_REGEN_DISABLED fired - checking if early combat already handled collapse")
+                
+                -- Check if early combat detection already handled the collapse
+                if combatStateQueue.enteredCombatOutsideInstance and not combatStateQueue.shouldCollapseOnCombatEnd then
+                    DebugPrint("Early combat detection already handled collapse - skipping duplicate attempt")
+                    return
+                end
+                
+                DebugPrint("Early combat did not fully handle collapse - attempting immediate collapse")
+                
+                -- Try to collapse immediately (before taint protection fully kicks in)
+                -- This is a backup in case PLAYER_ENTER_COMBAT didn't fire or failed
+                local success = false
+                local collapsed = 0
+                
+                -- Attempt immediate collapse of each enabled tracker
+                if settings.collapseQuests and QuestObjectiveTracker then
+                    local ok, err = pcall(function()
+                        if QuestObjectiveTracker.SetCollapsed then
+                            QuestObjectiveTracker:SetCollapsed(true)
+                            collapsed = collapsed + 1
+                        end
+                    end)
+                    if ok then
+                        DebugPrint("Quest tracker immediately collapsed in combat")
+                    else
+                        DebugPrint("Failed to immediately collapse quest tracker: " .. tostring(err))
+                    end
+                end
+                
+                if settings.collapseAchievements and AchievementObjectiveTracker then
+                    local ok, err = pcall(function()
+                        if AchievementObjectiveTracker.SetCollapsed then
+                            AchievementObjectiveTracker:SetCollapsed(true)
+                            collapsed = collapsed + 1
+                        end
+                    end)
+                    if ok then
+                        DebugPrint("Achievement tracker immediately collapsed in combat")
+                    else
+                        DebugPrint("Failed to immediately collapse achievement tracker: " .. tostring(err))
+                    end
+                end
+                
+                if settings.collapseBonusObjectives and BonusObjectiveTracker then
+                    local ok, err = pcall(function()
+                        if BonusObjectiveTracker.SetCollapsed then
+                            BonusObjectiveTracker:SetCollapsed(true)
+                            collapsed = collapsed + 1
+                        end
+                    end)
+                    if ok then
+                        DebugPrint("Bonus objectives tracker immediately collapsed in combat")
+                    else
+                        DebugPrint("Failed to immediately collapse bonus objectives tracker: " .. tostring(err))
+                    end
+                end
+                
+                if settings.collapseCampaigns and CampaignQuestObjectiveTracker then
+                    local ok, err = pcall(function()
+                        if CampaignQuestObjectiveTracker.SetCollapsed then
+                            CampaignQuestObjectiveTracker:SetCollapsed(true)
+                            collapsed = collapsed + 1
+                        end
+                    end)
+                    if ok then
+                        DebugPrint("Campaign tracker immediately collapsed in combat")
+                    else
+                        DebugPrint("Failed to immediately collapse campaign tracker: " .. tostring(err))
+                    end
+                end
+                
+                if settings.collapseWorldQuests and WorldQuestObjectiveTracker then
+                    local ok, err = pcall(function()
+                        if WorldQuestObjectiveTracker.SetCollapsed then
+                            WorldQuestObjectiveTracker:SetCollapsed(true)
+                            collapsed = collapsed + 1
+                        end
+                    end)
+                    if ok then
+                        DebugPrint("World quest tracker immediately collapsed in combat")
+                    else
+                        DebugPrint("Failed to immediately collapse world quest tracker: " .. tostring(err))
+                    end
+                end
+                
+                if collapsed > 0 then
+                    DebugPrint("Successfully collapsed " .. collapsed .. " trackers immediately in combat")
+                    success = true
+                else
+                    DebugPrint("No trackers could be collapsed immediately - queuing for after combat")
+                end
+                
+                -- If immediate collapse failed or was incomplete, queue it for when combat ends
+                if not success or collapsed == 0 then
+                    combatStateQueue.enteredCombatOutsideInstance = true
+                    combatStateQueue.shouldCollapseOnCombatEnd = true
+                    combatStateQueue.shouldExpandOnCombatEnd = false
+                    DebugPrint("Queuing remaining collapse operations for when combat ends")
+                else
+                    -- Mark that we don't need to queue since immediate collapse worked
+                    combatStateQueue.enteredCombatOutsideInstance = true
+                    combatStateQueue.shouldCollapseOnCombatEnd = false
+                    combatStateQueue.shouldExpandOnCombatEnd = false
+                end
+            else
+                DebugPrint("Combat collapse not enabled for this profile")
+            end
         elseif event == "PLAYER_REGEN_ENABLED" then
             DebugPrint("Leaving combat - checking queued operations")
             
@@ -362,9 +469,118 @@ local function OnCombatStateChanged(event)
             
             -- Reset combat tracking
             combatStateQueue.enteredCombatOutsideInstance = false
+            
         end
     else
         DebugPrint("In dungeon/instance - skipping combat state change handling")
+    end
+end
+
+-- Early combat detection - this fires before PLAYER_REGEN_DISABLED
+local function OnEarlyCombat(event)
+    local profile = GetCurrentQLCProfile and GetCurrentQLCProfile() or QuestLogCollapseDB
+    if not profile or not profile.enabled then
+        DebugPrint("Addon disabled or no profile found")
+        return
+    end
+    
+    -- Make sure we're not in a dungeon to avoid conflicts
+    if not IsInDungeon() then
+        if event == "PLAYER_ENTER_COMBAT" then
+            -- Check if combat collapse is enabled
+            local settings = GetCurrentInstanceSettings and GetCurrentInstanceSettings()
+            if settings and settings.enabled then
+                DebugPrint("Early combat detection (PLAYER_ENTER_COMBAT) - attempting immediate collapse")
+                
+                -- Try to collapse immediately - this happens BEFORE taint protection
+                local collapsed = 0
+                
+                -- Attempt immediate collapse of each enabled tracker
+                if settings.collapseQuests and QuestObjectiveTracker then
+                    local ok, err = pcall(function()
+                        if QuestObjectiveTracker.SetCollapsed then
+                            QuestObjectiveTracker:SetCollapsed(true)
+                            collapsed = collapsed + 1
+                        end
+                    end)
+                    if ok then
+                        DebugPrint("Quest tracker collapsed via early combat detection")
+                    else
+                        DebugPrint("Failed early collapse of quest tracker: " .. tostring(err))
+                    end
+                end
+                
+                if settings.collapseAchievements and AchievementObjectiveTracker then
+                    local ok, err = pcall(function()
+                        if AchievementObjectiveTracker.SetCollapsed then
+                            AchievementObjectiveTracker:SetCollapsed(true)
+                            collapsed = collapsed + 1
+                        end
+                    end)
+                    if ok then
+                        DebugPrint("Achievement tracker collapsed via early combat detection")
+                    else
+                        DebugPrint("Failed early collapse of achievement tracker: " .. tostring(err))
+                    end
+                end
+                
+                if settings.collapseBonusObjectives and BonusObjectiveTracker then
+                    local ok, err = pcall(function()
+                        if BonusObjectiveTracker.SetCollapsed then
+                            BonusObjectiveTracker:SetCollapsed(true)
+                            collapsed = collapsed + 1
+                        end
+                    end)
+                    if ok then
+                        DebugPrint("Bonus objectives tracker collapsed via early combat detection")
+                    else
+                        DebugPrint("Failed early collapse of bonus objectives tracker: " .. tostring(err))
+                    end
+                end
+                
+                if settings.collapseCampaigns and CampaignQuestObjectiveTracker then
+                    local ok, err = pcall(function()
+                        if CampaignQuestObjectiveTracker.SetCollapsed then
+                            CampaignQuestObjectiveTracker:SetCollapsed(true)
+                            collapsed = collapsed + 1
+                        end
+                    end)
+                    if ok then
+                        DebugPrint("Campaign tracker collapsed via early combat detection")
+                    else
+                        DebugPrint("Failed early collapse of campaign tracker: " .. tostring(err))
+                    end
+                end
+                
+                if settings.collapseWorldQuests and WorldQuestObjectiveTracker then
+                    local ok, err = pcall(function()
+                        if WorldQuestObjectiveTracker.SetCollapsed then
+                            WorldQuestObjectiveTracker:SetCollapsed(true)
+                            collapsed = collapsed + 1
+                        end
+                    end)
+                    if ok then
+                        DebugPrint("World quest tracker collapsed via early combat detection")
+                    else
+                        DebugPrint("Failed early collapse of world quest tracker: " .. tostring(err))
+                    end
+                end
+                
+                if collapsed > 0 then
+                    DebugPrint("Successfully collapsed " .. collapsed .. " trackers via early combat detection")
+                    -- Mark that we successfully handled combat collapse early
+                    combatStateQueue.enteredCombatOutsideInstance = true
+                    combatStateQueue.shouldCollapseOnCombatEnd = false
+                    combatStateQueue.shouldExpandOnCombatEnd = false
+                else
+                    DebugPrint("No trackers collapsed via early detection - will try again on PLAYER_REGEN_DISABLED")
+                end
+            else
+                DebugPrint("Combat collapse not enabled for this profile")
+            end
+        end
+    else
+        DebugPrint("In dungeon/instance - skipping early combat detection")
     end
 end
 -- Event handler
@@ -377,6 +593,9 @@ QuestLogCollapse:SetScript("OnEvent", function(self, event, ...)
         DebugPrint("Player entered world - addon fully loaded")
     elseif event == "ZONE_CHANGED_NEW_AREA" then
         OnZoneChanged()
+    elseif event == "PLAYER_ENTER_COMBAT" then
+        -- Handle early combat detection (fires before PLAYER_REGEN_DISABLED)
+        OnEarlyCombat(event)
     elseif event == "PLAYER_REGEN_DISABLED" or event == "PLAYER_REGEN_ENABLED" then
         -- Handle combat options
         OnCombatStateChanged(event)
@@ -401,10 +620,13 @@ function SlashCmdList.QUESTLOGCOLLAPSE(msg)
         print("|cffff0000/qlc collapse|r - Manually collapse configured sections")
         print("|cffff0000/qlc expand|r - Manually expand all collapsed sections")
         print("|cffff0000/qlc test|r - Test objective tracker detection")
+        print("|cffff0000/qlc testcombat|r - Test combat collapse behavior")
         print("|cffff0000/qlc config|r - Open configuration panel")
         print("")
         print("|cff00ff00Combat Behavior:|r")
-        print("• Operations during combat are queued and applied when combat ends")
+        print("• Quest trackers collapse via early combat detection (PLAYER_ENTER_COMBAT)")
+        print("• Fallback attempt during PLAYER_REGEN_DISABLED if early detection fails")
+        print("• If immediate collapse fails, operations are queued for when combat ends")
         print("• Use |cffff0000/qlc expand|r during combat to cancel queued operations")
         print("Available sections: quests, achievements, bonus, scenarios,")
         print("campaigns, professions, monthly, widgets, adventuremaps")
@@ -521,6 +743,35 @@ function SlashCmdList.QUESTLOGCOLLAPSE(msg)
         print("  Entered Combat Outside Instance: " .. (combatStateQueue.enteredCombatOutsideInstance and "Yes" or "No"))
         print("  Collapse Queued: " .. (combatStateQueue.shouldCollapseOnCombatEnd and "Yes" or "No"))
         print("  Expand Queued: " .. (combatStateQueue.shouldExpandOnCombatEnd and "Yes" or "No"))
+    elseif args[1] == "testcombat" then
+        print("|cff00ff00QuestLogCollapse Combat Test:|r")
+        local settings = GetCurrentInstanceSettings and GetCurrentInstanceSettings()
+        if settings then
+            print("Combat Settings Found: " .. (settings.enabled and "Enabled" or "Disabled"))
+            if settings.enabled then
+                print("Combat Collapse Sections:")
+                print("  Quests: " .. (settings.collapseQuests and "Yes" or "No"))
+                print("  Achievements: " .. (settings.collapseAchievements and "Yes" or "No"))
+                print("  Bonus Objectives: " .. (settings.collapseBonusObjectives and "Yes" or "No"))
+                print("  Campaigns: " .. (settings.collapseCampaigns and "Yes" or "No"))
+                print("  Scenarios: " .. (settings.collapseScenarios and "Yes" or "No"))
+                print("  Professions: " .. (settings.collapseProfessions and "Yes" or "No"))
+                print("  Monthly Activities: " .. (settings.collapseMonthlyActivities and "Yes" or "No"))
+                print("  UI Widgets: " .. (settings.collapseUIWidgets and "Yes" or "No"))
+                print("  Adventure Maps: " .. (settings.collapseAdventureMaps and "Yes" or "No"))
+                print("  World Quests: " .. (settings.collapseWorldQuests and "Yes" or "No"))
+                print("  Nameplate Control: " .. (settings.namePlates and settings.namePlates.enabled and "Yes" or "No"))
+            end
+        else
+            print("No combat settings found")
+        end
+        print("Current Combat State: " .. (InCombatLockdown() and "In Combat" or "Not in Combat"))
+        print("Current Instance State: " .. (IsInDungeon() and "In Instance" or "Outside Instance"))
+        print("Available Trackers:")
+        print("  QuestObjectiveTracker: " .. (QuestObjectiveTracker and "Available" or "Not found"))
+        print("  AchievementObjectiveTracker: " .. (AchievementObjectiveTracker and "Available" or "Not found"))
+        print("  BonusObjectiveTracker: " .. (BonusObjectiveTracker and "Available" or "Not found"))
+        print("  CampaignQuestObjectiveTracker: " .. (CampaignQuestObjectiveTracker and "Available" or "Not found"))
     else
         print("|cff00ff00QuestLogCollapse|r Unknown command. Type |cffff0000/qlc help|r for available commands.")
     end
