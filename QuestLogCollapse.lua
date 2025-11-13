@@ -17,7 +17,8 @@ local isFullyLoaded = false
 local combatStateQueue = {
     shouldCollapseOnCombatEnd = false,
     shouldExpandOnCombatEnd = false,
-    enteredCombatOutsideInstance = false
+    enteredCombatOutsideInstance = false,
+    trackersWereCollapsedInCombat = false
 }
 
 -- Default settings
@@ -433,40 +434,56 @@ local function OnCombatStateChanged(event)
                 
                 if collapsed > 0 then
                     DebugPrint("Successfully collapsed " .. collapsed .. " trackers immediately in combat")
-                else
-                    DebugPrint("No trackers could be collapsed immediately - queuing for after combat")
-                end
-                
-                -- If immediate collapse failed or was incomplete, queue it for when combat ends
-                if collapsed == 0 then
-                    combatStateQueue.enteredCombatOutsideInstance = true
-                    combatStateQueue.shouldCollapseOnCombatEnd = true
-                    combatStateQueue.shouldExpandOnCombatEnd = false
-                    DebugPrint("Queuing remaining collapse operations for when combat ends")
-                else
-                    -- Mark that we don't need to queue since immediate collapse worked
+                    -- Mark that we successfully collapsed and need to expand on combat end
                     combatStateQueue.enteredCombatOutsideInstance = true
                     combatStateQueue.shouldCollapseOnCombatEnd = false
                     combatStateQueue.shouldExpandOnCombatEnd = false
+                    combatStateQueue.trackersWereCollapsedInCombat = true
+                else
+                    DebugPrint("No trackers could be collapsed immediately - queuing for after combat")
+                    -- Queue the operation for after combat ends
+                    combatStateQueue.enteredCombatOutsideInstance = true
+                    combatStateQueue.shouldCollapseOnCombatEnd = true
+                    combatStateQueue.shouldExpandOnCombatEnd = false
+                    combatStateQueue.trackersWereCollapsedInCombat = false
+                    DebugPrint("Queuing remaining collapse operations for when combat ends")
                 end
             else
                 DebugPrint("Combat collapse not enabled for this profile")
+                -- Still mark that we entered combat outside instance in case user manually interacts
+                combatStateQueue.enteredCombatOutsideInstance = true
+                combatStateQueue.shouldCollapseOnCombatEnd = false
+                combatStateQueue.shouldExpandOnCombatEnd = false
             end
         elseif event == "PLAYER_REGEN_ENABLED" then
-            DebugPrint("Leaving combat - checking queued operations")
+            DebugPrint("Leaving combat - checking queued operations and quest log state")
             
             if combatStateQueue.enteredCombatOutsideInstance and combatStateQueue.shouldCollapseOnCombatEnd then
                 DebugPrint("Applying queued collapse operation after combat")
                 CollapseQuestLog()
                 combatStateQueue.shouldCollapseOnCombatEnd = false
+                combatStateQueue.trackersWereCollapsedInCombat = true
             elseif combatStateQueue.shouldExpandOnCombatEnd then
                 DebugPrint("Applying queued expand operation after combat")
                 ExpandQuestLog()
                 combatStateQueue.shouldExpandOnCombatEnd = false
+            elseif combatStateQueue.enteredCombatOutsideInstance and combatStateQueue.trackersWereCollapsedInCombat then
+                -- If we were in combat outside instances and trackers were collapsed,
+                -- expand the quest log when combat ends to restore original state
+                local settings = GetCurrentInstanceSettings and GetCurrentInstanceSettings()
+                if settings and settings.enabled then
+                    DebugPrint("Combat ended outside instance - expanding quest log to restore original state")
+                    ExpandQuestLog()
+                else
+                    DebugPrint("Combat collapse not enabled - no expansion needed")
+                end
+            elseif combatStateQueue.enteredCombatOutsideInstance then
+                DebugPrint("Combat ended outside instance but no trackers were collapsed - no expansion needed")
             end
             
             -- Reset combat tracking
             combatStateQueue.enteredCombatOutsideInstance = false
+            combatStateQueue.trackersWereCollapsedInCombat = false
             
         end
     else
@@ -566,15 +583,23 @@ local function OnEarlyCombat(event)
                 
                 if collapsed > 0 then
                     DebugPrint("Successfully collapsed " .. collapsed .. " trackers via early combat detection")
-                    -- Mark that we successfully handled combat collapse early
+                    -- Mark that we successfully handled combat collapse early and need to expand on combat end
                     combatStateQueue.enteredCombatOutsideInstance = true
                     combatStateQueue.shouldCollapseOnCombatEnd = false
                     combatStateQueue.shouldExpandOnCombatEnd = false
+                    combatStateQueue.trackersWereCollapsedInCombat = true
                 else
                     DebugPrint("No trackers collapsed via early detection - will try again on PLAYER_REGEN_DISABLED")
+                    -- Still mark that we're in combat outside instance for potential later operations
+                    combatStateQueue.enteredCombatOutsideInstance = true
+                    combatStateQueue.trackersWereCollapsedInCombat = false
                 end
             else
                 DebugPrint("Combat collapse not enabled for this profile")
+                -- Still mark that we entered combat outside instance for potential manual interaction
+                combatStateQueue.enteredCombatOutsideInstance = true
+                combatStateQueue.shouldCollapseOnCombatEnd = false
+                combatStateQueue.shouldExpandOnCombatEnd = false
             end
         end
     else
@@ -624,6 +649,7 @@ function SlashCmdList.QUESTLOGCOLLAPSE(msg)
         print("|cff00ff00Combat Behavior:|r")
         print("• Quest trackers collapse via early combat detection (PLAYER_ENTER_COMBAT)")
         print("• Fallback attempt during PLAYER_REGEN_DISABLED if early detection fails")
+        print("• Quest trackers automatically expand when combat ends (outside instances)")
         print("• If immediate collapse fails, operations are queued for when combat ends")
         print("• Use |cffff0000/qlc expand|r during combat to cancel queued operations")
         print("Available sections: quests, achievements, bonus, scenarios,")
@@ -676,16 +702,15 @@ function SlashCmdList.QUESTLOGCOLLAPSE(msg)
         local settings = GetCurrentInstanceSettings and GetCurrentInstanceSettings()
         if settings then
             local instanceType = select(2, IsInInstance())
-            print("Current Instance Settings (" .. (instanceType or "none") .. "):")
-            print("  Instance Type Enabled: " .. (settings.enabled and "Yes" or "No"))
+        print("Current Instance Settings (" .. (instanceType or "none") .. "):")
+        print("  Instance Type Enabled: " .. (settings.enabled and "Yes" or "No"))
         end
 
         print("|cff00ff00Combat Queue Status:|r")
         print("  Entered Combat Outside Instance: " .. (combatStateQueue.enteredCombatOutsideInstance and "Yes" or "No"))
         print("  Collapse Queued: " .. (combatStateQueue.shouldCollapseOnCombatEnd and "Yes" or "No"))
         print("  Expand Queued: " .. (combatStateQueue.shouldExpandOnCombatEnd and "Yes" or "No"))
-
-        print("|cff00ff00Current Section States:|r")
+        print("  Trackers Collapsed in Combat: " .. (combatStateQueue.trackersWereCollapsedInCombat and "Yes" or "No"))        print("|cff00ff00Current Section States:|r")
         if QuestObjectiveTracker then
             print("Quests: " .. (QuestObjectiveTracker.collapsed and "Collapsed" or "Expanded"))
         end
@@ -741,6 +766,7 @@ function SlashCmdList.QUESTLOGCOLLAPSE(msg)
         print("  Entered Combat Outside Instance: " .. (combatStateQueue.enteredCombatOutsideInstance and "Yes" or "No"))
         print("  Collapse Queued: " .. (combatStateQueue.shouldCollapseOnCombatEnd and "Yes" or "No"))
         print("  Expand Queued: " .. (combatStateQueue.shouldExpandOnCombatEnd and "Yes" or "No"))
+        print("  Trackers Collapsed in Combat: " .. (combatStateQueue.trackersWereCollapsedInCombat and "Yes" or "No"))
     elseif args[1] == "testcombat" then
         print("|cff00ff00QuestLogCollapse Combat Test:|r")
         local settings = GetCurrentInstanceSettings and GetCurrentInstanceSettings()
