@@ -1,8 +1,8 @@
-## Interface: 110002
+## Interface: 120000
 ## Title: QuestLogCollapse
 ## Notes: Automatically collapses the quest log when entering dungeons
 ## Author: Gaspode
-## Version: 1.2.0
+## Version: 1.2.1
 ## SavedVariables: QuestLogCollapseDB
 ## SavedVariablesPerCharacter: QuestLogCollapseCharDB
 
