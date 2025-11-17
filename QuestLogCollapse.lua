@@ -21,6 +21,12 @@ local combatStateQueue = {
     trackersWereCollapsedInCombat = false
 }
 
+-- Track nameplate state to restore properly
+local namePlateState = {
+    originalShowAll = nil,  -- Original value before addon touched it
+    addonControlled = false -- Whether the addon is currently controlling nameplates
+}
+
 -- Default settings
 local defaults = {
     enabled = true,
@@ -152,8 +158,22 @@ local function CollapseQuestLog()
     
     -- Handle nameplate settings (only if not in combat)
     if settings.namePlates and settings.namePlates.enabled and not InCombatLockdown() then
-        DebugPrint("Enabling nameplates for instance")
-        SetCVar("nameplateShowAll", 1)
+        DebugPrint("Enabling ENEMY nameplates for instance")
+        -- Store original state before changing it (only if we haven't already)
+        if not namePlateState.addonControlled then
+            namePlateState.originalShowAll = GetCVar("nameplateShowEnemies")
+            DebugPrint("Stored original ENEMY nameplate state: " .. tostring(namePlateState.originalShowAll))
+            -- Debug: Show current state of all nameplate CVars
+            DebugPrint("Before change - nameplateShowAll: " .. tostring(GetCVar("nameplateShowAll")))
+            DebugPrint("Before change - nameplateShowEnemies: " .. tostring(GetCVar("nameplateShowEnemies")))
+            DebugPrint("Before change - nameplateShowFriends: " .. tostring(GetCVar("nameplateShowFriends")))
+        end
+        namePlateState.addonControlled = true
+        SetCVar("nameplateShowEnemies", "1")
+        -- Debug: Show state after change
+        DebugPrint("After change - nameplateShowAll: " .. tostring(GetCVar("nameplateShowAll")))
+        DebugPrint("After change - nameplateShowEnemies: " .. tostring(GetCVar("nameplateShowEnemies")))
+        DebugPrint("After change - nameplateShowFriends: " .. tostring(GetCVar("nameplateShowFriends")))
     end
 end
 
@@ -270,10 +290,23 @@ local function ExpandQuestLog()
 
     DebugPrint("Expanded " .. expanded .. " sections/modules")
     
-    -- Restore nameplate settings (only if not in combat)
-    if not InCombatLockdown() then
-        DebugPrint("Disabling nameplates after leaving instance")
-        SetCVar("nameplateShowAll", 0)
+    -- Restore nameplate settings (only if the addon was controlling them)
+    if namePlateState.addonControlled and not InCombatLockdown() then
+        DebugPrint("Restoring original ENEMY nameplate state: " .. tostring(namePlateState.originalShowAll))
+        -- Debug: Show current state before restoration
+        DebugPrint("Before restore - nameplateShowAll: " .. tostring(GetCVar("nameplateShowAll")))
+        DebugPrint("Before restore - nameplateShowEnemies: " .. tostring(GetCVar("nameplateShowEnemies")))
+        DebugPrint("Before restore - nameplateShowFriends: " .. tostring(GetCVar("nameplateShowFriends")))
+        
+        SetCVar("nameplateShowEnemies", namePlateState.originalShowAll or "0")
+        
+        -- Debug: Show state after restoration
+        DebugPrint("After restore - nameplateShowAll: " .. tostring(GetCVar("nameplateShowAll")))
+        DebugPrint("After restore - nameplateShowEnemies: " .. tostring(GetCVar("nameplateShowEnemies")))
+        DebugPrint("After restore - nameplateShowFriends: " .. tostring(GetCVar("nameplateShowFriends")))
+        
+        namePlateState.addonControlled = false
+        namePlateState.originalShowAll = nil
     end
 end
 
@@ -710,7 +743,16 @@ function SlashCmdList.QUESTLOGCOLLAPSE(msg)
         print("  Entered Combat Outside Instance: " .. (combatStateQueue.enteredCombatOutsideInstance and "Yes" or "No"))
         print("  Collapse Queued: " .. (combatStateQueue.shouldCollapseOnCombatEnd and "Yes" or "No"))
         print("  Expand Queued: " .. (combatStateQueue.shouldExpandOnCombatEnd and "Yes" or "No"))
-        print("  Trackers Collapsed in Combat: " .. (combatStateQueue.trackersWereCollapsedInCombat and "Yes" or "No"))        print("|cff00ff00Current Section States:|r")
+        print("  Trackers Collapsed in Combat: " .. (combatStateQueue.trackersWereCollapsedInCombat and "Yes" or "No"))
+        
+        print("|cff00ff00Nameplate Status:|r")
+        print("  Addon Controlled: " .. (namePlateState.addonControlled and "Yes" or "No"))
+        print("  Original State: " .. tostring(namePlateState.originalShowAll or "None"))
+        print("  Current nameplateShowAll: " .. tostring(GetCVar("nameplateShowAll")))
+        print("  Current nameplateShowEnemies: " .. tostring(GetCVar("nameplateShowEnemies")))
+        print("  Current nameplateShowFriends: " .. tostring(GetCVar("nameplateShowFriends")))
+        
+        print("|cff00ff00Current Section States:|r")
         if QuestObjectiveTracker then
             print("Quests: " .. (QuestObjectiveTracker.collapsed and "Collapsed" or "Expanded"))
         end
