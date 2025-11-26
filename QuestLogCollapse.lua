@@ -20,6 +20,72 @@ QuestLogCollapse:RegisterEvent("PLAYER_REGEN_DISABLED")
 QuestLogCollapse:RegisterEvent("PLAYER_REGEN_ENABLED")
 QuestLogCollapse:RegisterEvent("PLAYER_ENTERING_WORLD")
 
+-- Taint-safe deferral logic
+local mapSystemBusy = false
+local mapSystemBusyUntil = 0
+local pendingOperations = {}
+
+local function SetMapSystemBusy(seconds)
+    mapSystemBusy = true
+    mapSystemBusyUntil = GetTime() + seconds
+end
+
+local function CheckMapSystemBusy()
+    if mapSystemBusy and GetTime() > mapSystemBusyUntil then
+        mapSystemBusy = false
+        mapSystemBusyUntil = 0
+        -- Process pending operations
+        for _, op in ipairs(pendingOperations) do
+            if op.action == "collapse" then
+                op.func()
+            elseif op.action == "expand" then
+                op.func()
+            end
+        end
+        pendingOperations = {}
+    end
+end
+
+local busyFrame = CreateFrame("Frame")
+busyFrame:SetScript("OnUpdate", function()
+    CheckMapSystemBusy()
+end)
+
+-- Wrap collapse/expand calls
+local function DeferOrRun(action, func)
+    if mapSystemBusy then
+        table.insert(pendingOperations, {action = action, func = func})
+    else
+        func()
+    end
+end
+
+-- Patch CollapseQuestLog and ExpandQuestLog
+local oldCollapse = CollapseQuestLog
+function CollapseQuestLog()
+    DeferOrRun("collapse", function() oldCollapse() end)
+end
+
+local oldExpand = ExpandQuestLog
+function ExpandQuestLog()
+    DeferOrRun("expand", function() oldExpand() end)
+end
+
+-- Patch zone change and initial load to set busy window
+local oldOnZoneChanged = OnZoneChanged
+function OnZoneChanged(...)
+    SetMapSystemBusy(12)
+    oldOnZoneChanged(...)
+end
+
+local oldOnAddonLoaded = OnAddonLoaded
+function OnAddonLoaded(addonName, ...)
+    if addonName == "QuestLogCollapse" then
+        SetMapSystemBusy(15)
+    end
+    oldOnAddonLoaded(addonName, ...)
+end
+
 -- Track if we're in the middle of map system operations to avoid interference
 local mapSystemBusy = false
 
