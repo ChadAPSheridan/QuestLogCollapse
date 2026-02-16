@@ -86,6 +86,71 @@ local defaults = {
         collapseUIWidgets = false,
         collapseAdventureMaps = false,
         namePlates = { enabled = false }
+    },
+    garrisons = {
+        enabled = false,
+        collapseQuests = false,
+        collapseAchievements = false,
+        collapseBonusObjectives = false,
+        collapseScenarios = false,
+        collapseCampaigns = false,
+        collapseProfessions = false,
+        collapseMonthlyActivities = false,
+        collapseUIWidgets = false,
+        collapseAdventureMaps = false,
+        namePlates = { enabled = false }
+    },
+    classHalls = {
+        enabled = false,
+        collapseQuests = false,
+        collapseAchievements = false,
+        collapseBonusObjectives = false,
+        collapseScenarios = false,
+        collapseCampaigns = false,
+        collapseProfessions = false,
+        collapseMonthlyActivities = false,
+        collapseUIWidgets = false,
+        collapseAdventureMaps = false,
+        namePlates = { enabled = false }
+    },
+    questTables = {
+        enabled = false,
+        collapseQuests = false,
+        collapseAchievements = false,
+        collapseBonusObjectives = false,
+        collapseScenarios = false,
+        collapseCampaigns = false,
+        collapseProfessions = false,
+        collapseMonthlyActivities = false,
+        collapseUIWidgets = false,
+        collapseAdventureMaps = false,
+        namePlates = { enabled = false }
+    },
+    neighbourhood = {
+        enabled = false,
+        collapseQuests = false,
+        collapseAchievements = false,
+        collapseBonusObjectives = false,
+        collapseScenarios = false,
+        collapseCampaigns = false,
+        collapseProfessions = false,
+        collapseMonthlyActivities = false,
+        collapseUIWidgets = false,
+        collapseAdventureMaps = false,
+        namePlates = { enabled = false }
+    },
+    house = {
+        enabled = false,
+        collapseQuests = false,
+        collapseAchievements = false,
+        collapseBonusObjectives = false,
+        collapseScenarios = false,
+        collapseCampaigns = false,
+        collapseProfessions = false,
+        collapseMonthlyActivities = false,
+        collapseUIWidgets = false,
+        collapseAdventureMaps = false,
+        namePlates = { enabled = false }
     }
 }
 
@@ -212,6 +277,20 @@ function CreateQuestLogCollapseConfigPanel()
         StaticPopup_Show("QUESTLOGCOLLAPSE_NEW_PROFILE")
     end)
 
+    local applyProfileBtn = CreateFrame("Button", nil, scrollChild, "UIPanelButtonTemplate")
+    applyProfileBtn:SetSize(100, 22)
+    applyProfileBtn:SetPoint("LEFT", newProfileBtn, "RIGHT", 10, 0)
+    applyProfileBtn:SetText("Apply")
+    applyProfileBtn:SetScript("OnClick", function()
+        if panel and panel.OnShow then
+            panel:OnShow()
+        end
+        -- Trigger OnZoneChanged to apply settings immediately
+        -- if OnZoneChanged then
+        --     C_Timer.After(0.1, OnZoneChanged)
+        -- end
+    end)
+
     -- Global settings
     local enabledCheck = CreateFrame("CheckButton", nil, scrollChild, "InterfaceOptionsCheckButtonTemplate")
     enabledCheck:SetPoint("TOPLEFT", profileLabel, "BOTTOMLEFT", 0, -30)
@@ -228,7 +307,12 @@ function CreateQuestLogCollapseConfigPanel()
         { key = "raids",         name = "Raids",         color = "|cffff8000" },
         { key = "scenarios",     name = "Scenarios",     color = "|cff0080ff" },
         { key = "battlegrounds", name = "Battlegrounds", color = "|cffff0080" },
-        { key = "arenas",        name = "Arenas",        color = "|cff8000ff" }
+        { key = "arenas",        name = "Arenas",        color = "|cff8000ff" },
+        { key = "garrisons",     name = "Garrisons",     color = "|cffffc000" },
+        { key = "classHalls",    name = "Class Halls",   color = "|cffff00ff" },
+        { key = "questTables",   name = "Quest Tables",  color = "|cffff8080" },
+        { key = "neighbourhood", name = "Neighbourhood", color = "|cff80ff80" },
+        { key = "house",         name = "House",         color = "|cffff80ff" }
     }
 
     local instanceContainers = {}
@@ -363,26 +447,46 @@ function CreateQuestLogCollapseConfigPanel()
         -- Update instance type settings
         for _, instanceInfo in ipairs(instanceTypes) do
             local container = instanceContainers[instanceInfo.key]
-            local instanceSettings = prof[instanceInfo.key]
 
-            container.enabledCheck:SetChecked(instanceSettings.enabled)
-
-            -- Update nameplate settings
-            if container.namePlatesEnabledCheck then
-                local namePlateEnabled = instanceSettings.namePlates and instanceSettings.namePlates.enabled or false
-                container.namePlatesEnabledCheck:SetChecked(namePlateEnabled)
+            -- Initialize missing instance settings from defaults
+            if not prof[instanceInfo.key] then
+                local defaultSettings = defaults[instanceInfo.key]
+                if defaultSettings and type(defaultSettings) == "table" then
+                    prof[instanceInfo.key] = {}
+                    for k, v in pairs(defaultSettings) do
+                        if type(v) == "table" then
+                            prof[instanceInfo.key][k] = {}
+                            for k2, v2 in pairs(v) do
+                                prof[instanceInfo.key][k][k2] = v2
+                            end
+                        else
+                            prof[instanceInfo.key][k] = v
+                        end
+                    end
+                end
             end
 
-            -- Update section checkboxes
-            local allSections = {
-                "collapseQuests", "collapseAchievements", "collapseBonusObjectives",
-                "collapseScenarios", "collapseCampaigns", "collapseProfessions",
-                "collapseMonthlyActivities", "collapseUIWidgets", "collapseAdventureMaps"
-            }
+            local instanceSettings = prof[instanceInfo.key]
+            if instanceSettings then
+                container.enabledCheck:SetChecked(instanceSettings.enabled)
 
-            for _, sectionKey in ipairs(allSections) do
-                if container[sectionKey] then
-                    container[sectionKey]:SetChecked(instanceSettings[sectionKey])
+                -- Update nameplate settings
+                if container.namePlatesEnabledCheck then
+                    local namePlateEnabled = instanceSettings.namePlates and instanceSettings.namePlates.enabled or false
+                    container.namePlatesEnabledCheck:SetChecked(namePlateEnabled)
+                end
+
+                -- Update section checkboxes
+                local allSections = {
+                    "collapseQuests", "collapseAchievements", "collapseBonusObjectives",
+                    "collapseScenarios", "collapseCampaigns", "collapseProfessions",
+                    "collapseMonthlyActivities", "collapseUIWidgets", "collapseAdventureMaps"
+                }
+
+                for _, sectionKey in ipairs(allSections) do
+                    if container[sectionKey] then
+                        container[sectionKey]:SetChecked(instanceSettings[sectionKey])
+                    end
                 end
             end
         end
@@ -413,6 +517,15 @@ configEventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 
 local panelRegistered = false
 
+-- Cleanup on profile switch
+function SwitchProfile(profileName)
+    QuestLogCollapseCharDB.currentProfile = profileName
+    -- Clear any unused references
+    if panel and panel.OnShow then
+        panel:OnShow()
+    end
+end
+
 configEventFrame:SetScript("OnEvent", function(self, event, addonName)
     if event == "ADDON_LOADED" and addonName == "QuestLogCollapse" then
         InitializeConfigDB()
@@ -423,7 +536,7 @@ configEventFrame:SetScript("OnEvent", function(self, event, addonName)
 
             local category = Settings.RegisterCanvasLayoutCategory(configPanel, "QuestLogCollapse")
             Settings.RegisterAddOnCategory(category)
-            configPanel.categoryID = category
+            configPanel.categoryID = category.ID
 
             panelRegistered = true
         end
@@ -437,9 +550,24 @@ function GetCurrentInstanceSettings()
     if not prof then return nil end
 
     local instanceType = select(2, IsInInstance())
-
+    DebugPrint("Current instance type: " .. tostring(instanceType))
     if instanceType == "party" then
-        return prof.dungeons
+        local isInGarrison = C_Garrison.IsPlayerInGarrison(Enum.GarrisonType.Type_6_0_Garrison)
+        local isInClassHall = C_Garrison.IsPlayerInGarrison(Enum.GarrisonType.Type_7_0_Garrison)
+        local isAtQuestTable = C_Garrison.IsAtGarrisonMissionNPC() or
+            C_Garrison.IsPlayerInGarrison(Enum.GarrisonType.Type_8_0_Garrison)
+        if isInGarrison then
+            DebugPrint("Player is in a garrison")
+            return prof.garrisons
+        elseif isInClassHall then
+            DebugPrint("Player is in a class hall")
+            return prof.classHalls
+        elseif isAtQuestTable then
+            DebugPrint("Player is at a quest table")
+            return prof.questTables
+        else
+            return prof.dungeons
+        end
     elseif instanceType == "raid" then
         return prof.raids
     elseif instanceType == "scenario" then
@@ -448,6 +576,10 @@ function GetCurrentInstanceSettings()
         return prof.battlegrounds
     elseif instanceType == "arena" then
         return prof.arenas
+    elseif instanceType == "neighborhood" then
+        return prof.neighbourhood
+    elseif instanceType == "interior" then
+        return prof.house
     else
         return prof.combat
     end

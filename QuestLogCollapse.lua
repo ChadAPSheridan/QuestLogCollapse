@@ -129,7 +129,7 @@ local defaults = {
 -- Initialize saved variables
 QuestLogCollapseDB = QuestLogCollapseDB or {}
 
-local function DebugPrint(message)
+function DebugPrint(message)
     local profile = GetCurrentQLCProfile and GetCurrentQLCProfile() or QuestLogCollapseDB
     if profile and profile.debug then
         print("|cff00ff00[QuestLogCollapse]|r " .. message)
@@ -139,7 +139,7 @@ end
 local function IsInDungeon()
     local instanceType = select(2, IsInInstance())
     return instanceType == "party" or instanceType == "raid" or instanceType == "scenario" or instanceType == "pvp" or
-        instanceType == "arena"
+        instanceType == "arena" or instanceType == "neighborhood" or instanceType == "interior"
 end
 
 -- Safe function to collapse a tracker using secure methods
@@ -881,6 +881,22 @@ QuestLogCollapse:SetScript("OnEvent", function(self, event, ...)
     end
 end)
 
+-- Periodic garbage collection during low-activity periods
+local gcFrame = CreateFrame("Frame")
+local lastGCTime = GetTime()
+gcFrame:SetScript("OnUpdate", function()
+    local currentTime = GetTime()
+    
+    -- Run garbage collection every 5 minutes (300 seconds) if not in combat/instance
+    if currentTime - lastGCTime > 300 then
+        if not InCombatLockdown() and not IsInDungeon() then
+            DebugPrint("Running periodic garbage collection")
+            collectgarbage("collect")
+            lastGCTime = currentTime
+        end
+    end
+end)
+
 -- Slash command handler
 SLASH_QUESTLOGCOLLAPSE1 = "/qlc"
 SLASH_QUESTLOGCOLLAPSE2 = "/questlogcollapse"
@@ -929,8 +945,9 @@ function SlashCmdList.QUESTLOGCOLLAPSE(msg)
             if Settings and Settings.OpenToCategory then
                 -- Try to register and open in the new settings system
                 if not configPanel.categoryID then
-                    configPanel.categoryID = Settings.RegisterCanvasLayoutCategory(configPanel, "QuestLogCollapse")
-                    Settings.RegisterAddOnCategory(configPanel.categoryID)
+                    local category = Settings.RegisterCanvasLayoutCategory(configPanel, "QuestLogCollapse")
+                    Settings.RegisterAddOnCategory(category)
+                    configPanel.categoryID = category.ID
                 end
                 Settings.OpenToCategory(configPanel.categoryID)
             elseif InterfaceOptionsFrame_OpenToCategory and configPanel then
