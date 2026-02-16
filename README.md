@@ -68,6 +68,11 @@ Configure different behaviors for each type of instance:
 - **Scenarios**: Solo/small group story content
 - **Battlegrounds**: PvP battleground content
 - **Arenas**: PvP arena content
+- **Garrison**: Inside your Garrison
+- **Class Hall**: Inside your Legion Class Hall
+- **Quest/Map Tables**: When near/using a map/quest/campaign table
+- **Neighbourhood**: In your neighbourhood
+- **House**: In the interior of your house
 
 ### Individual Section Control
 For each instance type, you can control which objective tracker sections get collapsed:
@@ -217,7 +222,11 @@ This project is open source. Feel free to modify and distribute as needed.
 
 ## Changelog
 
-### Version 1.3.0
+### Verion 1.2.6
+- **New Instance Types Supported**: QLC now has configurable support for Garrisons, Class Halls, Quest Tables, Neighbourhoods, and House Interiors!
+- **Passive Garbage Collection**: In some rare situations (ie. repeated entering and exiting combat in a non-instance with other, non-contained combat/location tracking addons installed) the state tracking was balooning in memory footprint. Added non-intrusive GC to address.
+  
+### Version 1.2.3
 - **Automatic Quest Log Expansion**: Quest trackers now automatically expand when combat ends (only if they were collapsed during combat)
 - **Smart State Tracking**: Added tracking to determine which trackers were collapsed during combat for intelligent restoration
 - **Enhanced Combat Flow**: Complete combat cycle - collapse on enter, expand on exit (outside instances)
