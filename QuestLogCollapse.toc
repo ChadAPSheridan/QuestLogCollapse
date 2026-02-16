@@ -2,7 +2,7 @@
 ## Title: QuestLogCollapse
 ## Notes: Automatically collapses the quest log when entering dungeons
 ## Author: Gaspode
-## Version: 1.2.5
+## Version: 1.2.6
 ## SavedVariables: QuestLogCollapseDB
 ## SavedVariablesPerCharacter: QuestLogCollapseCharDB
 
