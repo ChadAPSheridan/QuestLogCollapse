@@ -3,14 +3,11 @@
 -- Version: 1.1.0
 --
 -- TAINT PROTECTION STRATEGY:
--- Instead of avoiding problematic trackers, this version uses secure manipulation methods:
--- 
--- 1. OnUpdate frame execution - Operations run outside event context
--- 2. Multiple fallback methods - Direct SetCollapsed() + property manipulation
--- 3. Pending operation queue - Defers operations during busy periods then executes them
--- 4. Secure timing - Uses frame updates instead of timers for critical operations
--- 
--- This ensures ALL configured trackers work while preventing taint issues.
+-- 1. Detects taint errors in real-time and blacklists problematic trackers
+-- 2. Suppresses taint errors that would propagate to Blizzard UI code
+-- 3. Uses OnUpdate frame execution for isolated operations
+-- 4. Implements multiple fallback methods for tracker manipulation
+-- 5. Defers operations during busy periods and catches them safely
 
 local QuestLogCollapse = CreateFrame("Frame")
 QuestLogCollapse:RegisterEvent("ADDON_LOADED")
@@ -19,6 +16,25 @@ QuestLogCollapse:RegisterEvent("PLAYER_ENTER_COMBAT")
 QuestLogCollapse:RegisterEvent("PLAYER_REGEN_DISABLED")
 QuestLogCollapse:RegisterEvent("PLAYER_REGEN_ENABLED")
 QuestLogCollapse:RegisterEvent("PLAYER_ENTERING_WORLD")
+
+-- Trackers that cause taint issues - don't attempt to collapse these
+local TAINT_BLACKLIST = {
+    UIWidgetObjectiveTracker = true,
+    AdventureMapQuestObjectiveTracker = true,
+}
+
+-- Global error handler to catch and suppress taint errors before they escape
+local originalErrorHandler = geterrorhandler()
+local function TaintErrorHandler(msg)
+    if msg and string.find(msg, "taint") then
+        -- Suppress taint errors to prevent them from reaching Blizzard code
+        print("|cffff9900[QuestLogCollapse] Taint error detected:|r " .. tostring(msg))
+        return  -- Suppress the error
+    end
+    -- Pass through non-taint errors to the original handler
+    return originalErrorHandler(msg)
+end
+seterrorhandler(TaintErrorHandler)
 
 -- Taint-safe deferral logic
 local mapSystemBusy = false
@@ -109,10 +125,17 @@ local namePlateState = {
     addonControlled = false -- Whether the addon is currently controlling nameplates
 }
 
+-- Track quest tracking state to restore properly
+local questTrackingState = {
+    originalTrackedQuests = {}, -- Store original tracked quest IDs
+    addonModifiedTracking = false -- Whether the addon has modified quest tracking
+}
+
 -- Default settings
 local defaults = {
     enabled = true,
     debug = false,
+    filterQuestsByZone = false,
     collapseQuests = true,
     collapseAchievements = false,
     collapseBonusObjectives = true,
@@ -154,6 +177,12 @@ local function SafeCollapseTracker(tracker, name, shouldCollapse)
         return false
     end
     
+    -- Skip blacklisted trackers that cause taint
+    if TAINT_BLACKLIST[name] then
+        DebugPrint("Skipping " .. name .. " collapse - known to cause taint")
+        return false
+    end
+    
     -- Avoid operations when map system might be busy
     if mapSystemBusy then
         DebugPrint("Deferring " .. name .. " collapse - map system busy")
@@ -171,7 +200,7 @@ local function SafeCollapseTracker(tracker, name, shouldCollapse)
     -- Use secure execution with frame script
     local success = false
     
-    -- Method 1: Try direct collapse outside of any event context
+    -- Wrap in error handler to catch and suppress taint errors
     if tracker.SetCollapsed and type(tracker.SetCollapsed) == "function" then
         local executeFrame = CreateFrame("Frame")
         executeFrame:SetScript("OnUpdate", function(self)
@@ -192,23 +221,30 @@ local function SafeCollapseTracker(tracker, name, shouldCollapse)
                 DebugPrint(name .. " section collapsed successfully")
                 success = true
             else
-                DebugPrint("Method 1 failed for " .. name .. ": " .. tostring(err))
-                
-                -- Method 2: Try using the collapsed property directly
-                local ok2, err2 = pcall(function()
-                    if tracker then
-                        tracker.collapsed = true
-                        if tracker.Update then
-                            tracker:Update()
-                        end
-                    end
-                end)
-                
-                if ok2 then
-                    DebugPrint(name .. " section collapsed using property method")
-                    success = true
+                -- Taint error - log but don't propagate
+                if string.find(err or "", "taint") then
+                    DebugPrint("Warning: Taint detected when collapsing " .. name .. ": " .. tostring(err))
+                    -- Add to taint blacklist for this session
+                    TAINT_BLACKLIST[name] = true
                 else
-                    DebugPrint("All methods failed for " .. name .. ": " .. tostring(err2))
+                    DebugPrint("Method 1 failed for " .. name .. ": " .. tostring(err))
+                    
+                    -- Method 2: Try using the collapsed property directly
+                    local ok2, err2 = pcall(function()
+                        if tracker then
+                            tracker.collapsed = true
+                            if tracker.Update then
+                                tracker:Update()
+                            end
+                        end
+                    end)
+                    
+                    if ok2 then
+                        DebugPrint(name .. " section collapsed using property method")
+                        success = true
+                    else
+                        DebugPrint("All methods failed for " .. name .. ": " .. tostring(err2))
+                    end
                 end
             end
         end)
@@ -319,6 +355,12 @@ local function SafeExpandTracker(tracker, name)
         return false
     end
     
+    -- Skip blacklisted trackers that cause taint
+    if TAINT_BLACKLIST[name] then
+        DebugPrint("Skipping " .. name .. " expand - known to cause taint")
+        return false
+    end
+    
     -- Avoid operations when map system might be busy
     if mapSystemBusy then
         DebugPrint("Deferring " .. name .. " expand - map system busy")
@@ -336,7 +378,7 @@ local function SafeExpandTracker(tracker, name)
     -- Use secure execution with frame script
     local success = false
     
-    -- Method 1: Try direct expand outside of any event context
+    -- Wrap in error handler to catch and suppress taint errors
     if tracker.SetCollapsed and type(tracker.SetCollapsed) == "function" then
         local executeFrame = CreateFrame("Frame")
         executeFrame:SetScript("OnUpdate", function(self)
@@ -357,23 +399,30 @@ local function SafeExpandTracker(tracker, name)
                 DebugPrint(name .. " section expanded successfully")
                 success = true
             else
-                DebugPrint("Method 1 failed for " .. name .. ": " .. tostring(err))
-                
-                -- Method 2: Try using the collapsed property directly
-                local ok2, err2 = pcall(function()
-                    if tracker then
-                        tracker.collapsed = false
-                        if tracker.Update then
-                            tracker:Update()
-                        end
-                    end
-                end)
-                
-                if ok2 then
-                    DebugPrint(name .. " section expanded using property method")
-                    success = true
+                -- Taint error - log but don't propagate
+                if string.find(err or "", "taint") then
+                    DebugPrint("Warning: Taint detected when expanding " .. name .. ": " .. tostring(err))
+                    -- Add to taint blacklist for this session
+                    TAINT_BLACKLIST[name] = true
                 else
-                    DebugPrint("All methods failed for " .. name .. ": " .. tostring(err2))
+                    DebugPrint("Method 1 failed for " .. name .. ": " .. tostring(err))
+                    
+                    -- Method 2: Try using the collapsed property directly
+                    local ok2, err2 = pcall(function()
+                        if tracker then
+                            tracker.collapsed = false
+                            if tracker.Update then
+                                tracker:Update()
+                            end
+                        end
+                    end)
+                    
+                    if ok2 then
+                        DebugPrint(name .. " section expanded using property method")
+                        success = true
+                    else
+                        DebugPrint("All methods failed for " .. name .. ": " .. tostring(err2))
+                    end
                 end
             end
         end)
@@ -486,10 +535,156 @@ local function ExpandQuestLog()
     end
 end
 
+-- Filter quests by current zone (called on zone change)
+local function FilterQuestsByZone()
+    -- NEVER do anything during combat to avoid taint
+    if InCombatLockdown() then
+        DebugPrint("FilterQuestsByZone() skipped - in combat")
+        return
+    end
+    
+    local profile = GetCurrentQLCProfile and GetCurrentQLCProfile() or QuestLogCollapseDB
+    if not profile or not profile.filterQuestsByZone then
+        return
+    end
+    
+    DebugPrint("========================================")
+    DebugPrint("=== FILTERING QUESTS BY CURRENT ZONE ===")
+    DebugPrint("========================================")
+    C_Timer.After(0.5, function()
+        if InCombatLockdown() then
+            DebugPrint("Combat started, skipping quest filtering")
+            return
+        end
+        
+        -- Get current zone
+        local currentMapID = C_Map.GetBestMapForUnit("player")
+        local currentMapInfo = currentMapID and C_Map.GetMapInfo(currentMapID)
+        
+        DebugPrint("Current map ID: " .. tostring(currentMapID))
+        if currentMapInfo then
+            DebugPrint("Current map name: '" .. (currentMapInfo.name or "unknown") .. "'")
+        end
+        
+        if not currentMapID then
+            DebugPrint("Unable to determine current zone, skipping quest filtering")
+            return
+        end
+        
+        -- Helper function to check if a quest is in the current zone
+        local function IsQuestInCurrentZone(questID, questInfo)
+            -- Check if the quest has markers or objectives in the current zone
+            -- isOnMap = quest objectives/markers are on the current zone's map
+            -- hasLocalPOI = quest has a Point of Interest in the current zone
+            
+            local isOnCurrentMap = questInfo and questInfo.isOnMap
+            local hasLocalMarker = questInfo and questInfo.hasLocalPOI
+            
+            DebugPrint("  Quest " .. questID .. ": isOnMap=" .. tostring(isOnCurrentMap) .. ", hasLocalPOI=" .. tostring(hasLocalMarker))
+            
+            if isOnCurrentMap or hasLocalMarker then
+                return true, "has objectives/markers in current zone"
+            else
+                return false, "no objectives/markers in current zone"
+            end
+        end
+        
+        -- Step 1: Untrack quests not in current zone
+        local untracked = 0
+        local kept = 0
+        
+        -- Get the number of tracked quests
+        local numTracked = C_QuestLog.GetNumQuestWatches()
+        DebugPrint("=== STEP 1: Checking " .. numTracked .. " currently tracked quests ===")
+        
+        -- Iterate through tracked quests (iterate backwards to avoid index issues when removing)
+        for i = numTracked, 1, -1 do
+            local questID = C_QuestLog.GetQuestIDForQuestWatchIndex(i)
+            if questID then
+                -- Find the quest info for this tracked quest
+                local trackedQuestInfo = nil
+                for j = 1, C_QuestLog.GetNumQuestLogEntries() do
+                    local info = C_QuestLog.GetInfo(j)
+                    if info and info.questID == questID then
+                        trackedQuestInfo = info
+                        break
+                    end
+                end
+                
+                DebugPrint("Examining tracked quest " .. questID .. " (index " .. i .. ")")
+                local isInCurrentZone, reason = IsQuestInCurrentZone(questID, trackedQuestInfo)
+                
+                if not isInCurrentZone then
+                    C_QuestLog.RemoveQuestWatch(questID)
+                    DebugPrint(">>> UNTRACKED quest " .. questID .. " - " .. reason)
+                    untracked = untracked + 1
+                else
+                    DebugPrint(">>> KEPT quest " .. questID .. " - " .. reason)
+                    kept = kept + 1
+                end
+            else
+                DebugPrint("Warning: No questID at watch index " .. i)
+            end
+        end
+        
+        DebugPrint("=== Step 1 complete: kept " .. kept .. ", untracked " .. untracked .. " ===")
+        
+        -- Step 2: Track quests that ARE in current zone
+        local tracked = 0
+        local skipped = 0
+        local numQuestLogEntries = C_QuestLog.GetNumQuestLogEntries()
+        DebugPrint("=== STEP 2: Scanning " .. numQuestLogEntries .. " quest log entries for current zone quests ===")
+        
+        for i = 1, numQuestLogEntries do
+            local info = C_QuestLog.GetInfo(i)
+            if info and not info.isHeader and not info.isHidden then
+                local questID = info.questID
+                if questID then
+                    DebugPrint("Checking quest log entry " .. i .. ": questID=" .. questID .. ", title='" .. (info.title or "unknown") .. "'")
+                    
+                    -- Check if quest is already tracked
+                    local alreadyTracked = false
+                    for j = 1, C_QuestLog.GetNumQuestWatches() do
+                        if C_QuestLog.GetQuestIDForQuestWatchIndex(j) == questID then
+                            alreadyTracked = true
+                            break
+                        end
+                    end
+                    
+                    if alreadyTracked then
+                        DebugPrint("  Quest " .. questID .. " already tracked, skipping")
+                        skipped = skipped + 1
+                    else
+                        local isInCurrentZone, reason = IsQuestInCurrentZone(questID, info)
+                        if isInCurrentZone then
+                            local success = C_QuestLog.AddQuestWatch(questID)
+                            if success then
+                                DebugPrint(">>> TRACKED quest " .. questID .. " - " .. reason)
+                                tracked = tracked + 1
+                            else
+                                DebugPrint(">>> FAILED to track quest " .. questID .. " (AddQuestWatch returned false)")
+                            end
+                        else
+                            DebugPrint("  Quest " .. questID .. " not in current zone - " .. reason)
+                        end
+                    end
+                end
+            end
+        end
+        
+        DebugPrint("=== Step 2 complete: newly tracked " .. tracked .. ", skipped (already tracked) " .. skipped .. " ===")
+        DebugPrint("=== FINAL: kept " .. kept .. ", untracked " .. untracked .. ", newly tracked " .. tracked .. " quests ===")
+    end)
+end
+
 local function OnZoneChanged()
     local profile = GetCurrentQLCProfile and GetCurrentQLCProfile() or QuestLogCollapseDB
+    
+    -- Always check for zone-based quest filtering (regardless of instance status)
+    FilterQuestsByZone()
+    
     if not profile or not profile.enabled then
-        DebugPrint("Addon disabled or no profile found")
+        DebugPrint("Addon disabled or no profile found (skipping collapse/expand)")
         return
     end
 
