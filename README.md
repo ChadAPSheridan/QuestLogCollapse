@@ -1,7 +1,6 @@
 # QuestLogCollapse
 
 A World of Warcraft addon that automatically collapses the quest log when entering dungeons, raids, or combat situations.
-
 **Please Note: This addon does not work with client versions < 10.0**
 
 ## Features
@@ -44,6 +43,7 @@ The addon provides several slash commands for basic control:
 - `/qlc help` - Show all available commands
 
 ### Combat Behavior
+
 - **Early Combat Detection**: Quest trackers collapse via `PLAYER_ENTER_COMBAT` event (fires before taint protection)
 - **Fallback Collapse**: If early detection fails, attempts immediate collapse during `PLAYER_REGEN_DISABLED`
 - **Automatic Expansion**: Quest trackers automatically expand when combat ends (only if they were collapsed during combat)
@@ -55,13 +55,22 @@ The addon provides several slash commands for basic control:
 
 The addon features a comprehensive configuration panel accessible via `/qlc config`. The panel allows you to:
 
+### Global Settings
+
+- `Enable QuestLogCollapse` (default: true) - Whether the addon is active
+- `Filter Quests by Current Zone` (default: false) - Track/Untrack quests in your current zone.
+- `Debug Mode` (default: false) - Whether to show debug messages
+
 ### Profile Management
+
 - Create multiple profiles for different characters or situations
 - Switch between profiles easily
 - Each character can have their own profile settings
 
 ### Instance Type Settings
+
 Configure different behaviors for each type of instance:
+
 - **Combat**: Outside instances during combat situations
 - **Dungeons**: 5-player group content
 - **Raids**: Large group content  
@@ -75,7 +84,9 @@ Configure different behaviors for each type of instance:
 - **House**: In the interior of your house
 
 ### Individual Section Control
+
 For each instance type, you can control which objective tracker sections get collapsed:
+
 - **Quests**: Regular quest objectives
 - **Achievements**: Achievement progress tracking
 - **Bonus Objectives**: World quest and bonus objectives
@@ -88,6 +99,7 @@ For each instance type, you can control which objective tracker sections get col
 - **Adventure Maps**: Adventure map objectives
 
 ### Additional Options
+
 - **Nameplate Control**: Enable/disable enemy nameplates for each instance type
 - **Profile Management**: Create, switch, and manage multiple configuration profiles
 
@@ -113,6 +125,7 @@ The addon uses the World of Warcraft API to:
    - `AdventureMapQuestObjectiveTracker` - Adventure map objectives
 
 ### Combat Queue System
+
 - **Early Detection**: Uses `PLAYER_ENTER_COMBAT` event for earliest possible collapse (before taint protection)
 - **Dual-Layer Approach**: Fallback to `PLAYER_REGEN_DISABLED` if early detection fails or is incomplete
 - **Smart Expansion**: Tracks which trackers were collapsed during combat and only expands those on combat end
@@ -126,7 +139,8 @@ The addon uses the World of Warcraft API to:
 ## Technical Details
 
 ### File Structure
-```
+
+```text
 QuestLogCollapse/
 ├── QuestLogCollapse.toc           # Addon metadata and file loading
 ├── QuestLogCollapse.lua           # Main addon logic and event handling  
@@ -134,6 +148,7 @@ QuestLogCollapse/
 ```
 
 ### Events Handled
+
 - `ADDON_LOADED` - Initialize settings when addon loads
 - `PLAYER_ENTERING_WORLD` - Mark addon as fully loaded and ready
 - `ZONE_CHANGED_NEW_AREA` - Detect when player changes zones/instances
@@ -142,22 +157,9 @@ QuestLogCollapse/
 - `PLAYER_REGEN_ENABLED` - Handle leaving combat (apply queued operations)
 
 ### Database Structure
+
 - `QuestLogCollapseDB` - Global settings and profiles
 - `QuestLogCollapseCharDB` - Character-specific settings (current profile)
-
-## Configuration
-
-Settings are organized into profiles with the following structure:
-
-### Global Settings
-- `enabled` (default: true) - Whether the addon is active
-- `debug` (default: false) - Whether to show debug messages
-
-### Instance Type Settings (per profile)
-Each instance type (combat, dungeons, raids, scenarios, battlegrounds, arenas) has:
-- `enabled` - Whether to process this instance type
-- Individual section collapse settings for each ObjectiveTracker module
-- `namePlates.enabled` - Whether to show enemy nameplates for this instance type
 
 ## Compatibility
 
@@ -168,6 +170,7 @@ Each instance type (combat, dungeons, raids, scenarios, battlegrounds, arenas) h
 ## Troubleshooting
 
 ### Quest Log Not Collapsing/Expanding
+
 1. Check if the addon is enabled: `/qlc status`
 2. Open the configuration panel: `/qlc config`
 3. Verify that the current instance type is enabled in your active profile
@@ -176,6 +179,7 @@ Each instance type (combat, dungeons, raids, scenarios, battlegrounds, arenas) h
 6. Try manually toggling: `/qlc collapse` or `/qlc expand`
 
 ### Combat Operations Not Working
+
 1. Check if combat instance type is enabled: `/qlc config`
 2. Verify you're outside of instances (combat settings ignored in dungeons/raids)
 3. Check combat queue status: `/qlc status`
@@ -183,29 +187,35 @@ Each instance type (combat, dungeons, raids, scenarios, battlegrounds, arenas) h
 5. Try manual commands to test: `/qlc collapse` during combat
 
 ### Addon Taint Issues
+
 1. The addon now uses a combat queue system to prevent taint
 2. If you see "ADDON_ACTION_BLOCKED" errors, ensure you're using the latest version
 3. Operations during combat are queued and applied safely when combat ends
 4. Use `/qlc expand` during combat to cancel problematic queued operations
 
 ### Addon Not Loading
+
 1. Ensure files are in the correct directory
 2. Check that `QuestLogCollapse.toc` has the correct interface version
 3. Make sure all files are present and properly named (`QuestLogCollapse.lua`, `QuestLogCollapse_Config.lua`)
 4. Try `/reload` to refresh addons
 
 ### Configuration Panel Not Opening
+
 1. Make sure both lua files are loaded properly
 2. Check for any lua errors using an error display addon
 3. Try `/qlc help` to see if basic commands work
 
 ### Settings Not Saving
+
 1. Check that you have write permissions in your WoW directory
 2. Verify that `SavedVariables` and `SavedVariablesPerCharacter` are working
 3. Settings are saved when you log out or `/reload`
 
 ### Debug Information
+
 Enable debug mode with `/qlc debug` to see detailed information about:
+
 - Zone changes and dungeon detection
 - Combat state changes and queue operations
 - Quest log state changes
@@ -222,11 +232,19 @@ This project is open source. Feel free to modify and distribute as needed.
 
 ## Changelog
 
+### Version 1.2.7
+
+- **Zone Filtering Added**: You can now enable the option to have quests tracked and untracked based on your current zone.
+- **Error Handling Updates**: Added more error handling in a further attempt to catch those pesky taint errors before they escape.
+- **Documentation Updates & Fixes**: Configuration is now all listed in one area.
+
 ### Verion 1.2.6
+
 - **New Instance Types Supported**: QLC now has configurable support for Garrisons, Class Halls, Quest Tables, Neighbourhoods, and House Interiors!
 - **Passive Garbage Collection**: In some rare situations (ie. repeated entering and exiting combat in a non-instance with other, non-contained combat/location tracking addons installed) the state tracking was balooning in memory footprint. Added non-intrusive GC to address.
   
 ### Version 1.2.3
+
 - **Automatic Quest Log Expansion**: Quest trackers now automatically expand when combat ends (only if they were collapsed during combat)
 - **Smart State Tracking**: Added tracking to determine which trackers were collapsed during combat for intelligent restoration
 - **Enhanced Combat Flow**: Complete combat cycle - collapse on enter, expand on exit (outside instances)
@@ -234,6 +252,7 @@ This project is open source. Feel free to modify and distribute as needed.
 - **Enhanced Debug Information**: Added tracker collapse state to status and test commands
 
 ### Version 1.2.0
+
 - **Early Combat Detection**: Added `PLAYER_ENTER_COMBAT` event for earliest possible quest tracker collapse
 - **Dual-Layer Combat System**: Early detection + fallback system for maximum reliability
 - **Improved Success Rate**: Better chance of collapsing trackers before taint protection activates
@@ -241,6 +260,7 @@ This project is open source. Feel free to modify and distribute as needed.
 - **Reduced Taint Risk**: Earlier event handling reduces reliance on protected functions during combat
 
 ### Version 1.1.0
+
 - **Enhanced Combat Collapse**: Quest trackers now attempt immediate collapse when entering combat
 - **Improved Combat Handling**: Added fallback queuing system when immediate collapse fails due to taint protection
 - **New Test Command**: Added `/qlc testcombat` to test combat settings and tracker availability
@@ -248,6 +268,7 @@ This project is open source. Feel free to modify and distribute as needed.
 - **World Quest Support**: Added world quest tracker support to immediate combat collapse
 
 ### Version 1.0.0
+
 - Initial release with comprehensive functionality
 - Automatic quest log collapse/expand based on instance entry/exit
 - Combat collapse support with smart queue system

@@ -8,6 +8,7 @@ local QLC = QuestLogCollapseDB or {}
 local defaults = {
     enabled = true,
     debug = false,
+    filterQuestsByZone = false,
     -- Instance type settings
     combat = {
         enabled = false,
@@ -257,7 +258,7 @@ function CreateQuestLogCollapseConfigPanel()
 
     -- Create scroll child (content frame)
     local scrollChild = CreateFrame("Frame", nil, scrollFrame)
-    scrollChild:SetSize(600, 700) -- Adjusted height to fit all 6 instance containers + padding
+    scrollChild:SetSize(600, 1150) -- Adjusted height to fit all 11 instance containers + global settings + padding
     scrollFrame:SetScrollChild(scrollChild)
 
     -- Profile section
@@ -296,8 +297,12 @@ function CreateQuestLogCollapseConfigPanel()
     enabledCheck:SetPoint("TOPLEFT", profileLabel, "BOTTOMLEFT", 0, -30)
     enabledCheck.Text:SetText("Enable QuestLogCollapse")
 
+    local filterQuestsByZoneCheck = CreateFrame("CheckButton", nil, scrollChild, "InterfaceOptionsCheckButtonTemplate")
+    filterQuestsByZoneCheck:SetPoint("LEFT", enabledCheck, "RIGHT", 200, 0)
+    filterQuestsByZoneCheck.Text:SetText("Filter Quests by Current Zone")
+
     local debugCheck = CreateFrame("CheckButton", nil, scrollChild, "InterfaceOptionsCheckButtonTemplate")
-    debugCheck:SetPoint("LEFT", enabledCheck, "RIGHT", 200, 0)
+    debugCheck:SetPoint("LEFT", filterQuestsByZoneCheck, "RIGHT", 200, 0)
     debugCheck.Text:SetText("Debug Mode")
 
     -- type containers
@@ -316,7 +321,7 @@ function CreateQuestLogCollapseConfigPanel()
     }
 
     local instanceContainers = {}
-    local yOffset = -80
+    local yOffset = -110
 
     for i, instanceInfo in ipairs(instanceTypes) do
         local container = CreateFrame("Frame", nil, scrollChild, "BackdropTemplate")
@@ -443,6 +448,7 @@ function CreateQuestLogCollapseConfigPanel()
         -- Update global settings
         enabledCheck:SetChecked(prof.enabled)
         debugCheck:SetChecked(prof.debug)
+        filterQuestsByZoneCheck:SetChecked(prof.filterQuestsByZone or false)
 
         -- Update instance type settings
         for _, instanceInfo in ipairs(instanceTypes) do
@@ -505,6 +511,11 @@ function CreateQuestLogCollapseConfigPanel()
     debugCheck:SetScript("OnClick", function(self)
         local prof = getProfile()
         prof.debug = self:GetChecked()
+    end)
+
+    filterQuestsByZoneCheck:SetScript("OnClick", function(self)
+        local prof = getProfile()
+        prof.filterQuestsByZone = self:GetChecked()
     end)
 
     return panel
