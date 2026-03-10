@@ -790,7 +790,7 @@ local function OnAddonLoaded(addonName)
         end
     end
 
-    print("|cff00ff00QuestLogCollapse|r v1.0.0 loaded. Type |cffff0000/qlc config|r for options.")
+    print("|cff00ff00QuestLogCollapse|r v1.2.8 loaded. Type |cffff0000/qlc config|r for options.")
     print("|cffff9900[QuestLogCollapse]|r Note: Some trackers (Quests, Bonus Objectives, World Quests) are disabled by default to prevent UI taint. Enable at your own risk.")
 
     -- Check initial state with a MUCH longer delay to avoid conflicts during addon loading
