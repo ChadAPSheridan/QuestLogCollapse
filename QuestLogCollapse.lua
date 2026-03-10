@@ -3,38 +3,42 @@
 -- Version: 1.1.0
 --
 -- TAINT PROTECTION STRATEGY:
--- 1. Detects taint errors in real-time and blacklists problematic trackers
--- 2. Suppresses taint errors that would propagate to Blizzard UI code
--- 3. Uses OnUpdate frame execution for isolated operations
--- 4. Implements multiple fallback methods for tracker manipulation
--- 5. Defers operations during busy periods and catches them safely
+-- 1. Uses extremely conservative timing to avoid quest system initialization
+-- 2. Never manipulates UI during the critical 15+ second period after zone change
+-- 3. Avoids all direct tracker manipulation that could cause taint
+-- 4. Suppresses global error handler modification (causes more problems than it solves)
+-- 5. Uses deferred execution with very long delays to ensure quest system is idle
 
 local QuestLogCollapse = CreateFrame("Frame")
 QuestLogCollapse:RegisterEvent("ADDON_LOADED")
 QuestLogCollapse:RegisterEvent("ZONE_CHANGED_NEW_AREA")
-QuestLogCollapse:RegisterEvent("PLAYER_ENTER_COMBAT")
 QuestLogCollapse:RegisterEvent("PLAYER_REGEN_DISABLED")
 QuestLogCollapse:RegisterEvent("PLAYER_REGEN_ENABLED")
 QuestLogCollapse:RegisterEvent("PLAYER_ENTERING_WORLD")
 
 -- Trackers that cause taint issues - don't attempt to collapse these
+-- This list is updated dynamically when taint is detected
 local TAINT_BLACKLIST = {
     UIWidgetObjectiveTracker = true,
     AdventureMapQuestObjectiveTracker = true,
+    QuestDataProvider = true,
+    QuestObjectiveTracker = true,  -- Causes widget taint
+    WorldQuestObjectiveTracker = true,  -- Causes map system taint
+    BonusObjectiveTracker = true,  -- Causes area POI taint
 }
 
--- Global error handler to catch and suppress taint errors before they escape
-local originalErrorHandler = geterrorhandler()
-local function TaintErrorHandler(msg)
-    if msg and string.find(msg, "taint") then
-        -- Suppress taint errors to prevent them from reaching Blizzard code
-        print("|cffff9900[QuestLogCollapse] Taint error detected:|r " .. tostring(msg))
-        return  -- Suppress the error
+-- Helper function to check if a value is tainted
+local function IsTainted(value)
+    if type(value) == "number" then
+        -- Try to use the number in a protected operation
+        local success = securecall(function()
+            local _ = value + 0
+            return true
+        end)
+        return not success
     end
-    -- Pass through non-taint errors to the original handler
-    return originalErrorHandler(msg)
+    return false
 end
-seterrorhandler(TaintErrorHandler)
 
 -- Taint-safe deferral logic
 local mapSystemBusy = false
@@ -136,16 +140,16 @@ local defaults = {
     enabled = true,
     debug = false,
     filterQuestsByZone = false,
-    collapseQuests = true,
-    collapseAchievements = false,
-    collapseBonusObjectives = true,
-    collapseScenarios = false,
+    collapseQuests = false,  -- Disabled by default - causes taint
+    collapseAchievements = true,
+    collapseBonusObjectives = false,  -- Disabled by default - causes area POI taint
+    collapseScenarios = true,
     collapseCampaigns = true,
-    collapseProfessions = false,
-    collapseMonthlyActivities = false,
-    collapseUIWidgets = false,
-    collapseAdventureMaps = false,
-    collapseWorldQuests = false,
+    collapseProfessions = true,
+    collapseMonthlyActivities = true,
+    collapseUIWidgets = false,  -- Disabled by default - causes widget taint
+    collapseAdventureMaps = false,  -- Disabled by default - causes map taint
+    collapseWorldQuests = false,  -- Disabled by default - causes map taint
     namePlates = { enabled = false }
 }
 
@@ -179,7 +183,14 @@ local function SafeCollapseTracker(tracker, name, shouldCollapse)
     
     -- Skip blacklisted trackers that cause taint
     if TAINT_BLACKLIST[name] then
-        DebugPrint("Skipping " .. name .. " collapse - known to cause taint")
+        DebugPrint("Skipping " .. name .. " collapse - blacklisted (causes UI taint)")
+        return false
+    end
+    
+    -- Also check by tracker object reference
+    local trackerName = tracker and tracker:GetName()
+    if trackerName and TAINT_BLACKLIST[trackerName] then
+        DebugPrint("Skipping " .. name .. " collapse - blacklisted by object name (" .. trackerName .. ")")
         return false
     end
     
@@ -357,7 +368,14 @@ local function SafeExpandTracker(tracker, name)
     
     -- Skip blacklisted trackers that cause taint
     if TAINT_BLACKLIST[name] then
-        DebugPrint("Skipping " .. name .. " expand - known to cause taint")
+        DebugPrint("Skipping " .. name .. " expand - blacklisted (causes UI taint)")
+        return false
+    end
+    
+    -- Also check by tracker object reference
+    local trackerName = tracker and tracker:GetName()
+    if trackerName and TAINT_BLACKLIST[trackerName] then
+        DebugPrint("Skipping " .. name .. " expand - blacklisted by object name (" .. trackerName .. ")")
         return false
     end
     
@@ -693,13 +711,14 @@ local function OnZoneChanged()
     -- Set a flag to indicate map system might be busy
     mapSystemBusy = true
     
-    -- Reset the flag after a longer delay to be extra safe
-    C_Timer.After(8.0, function()
+    -- Reset the flag after a MUCH longer delay to be extra safe
+    -- The quest data provider needs 30+ seconds to fully initialize after zone change
+    C_Timer.After(30.0, function()
         mapSystemBusy = false
         -- Process any pending operations
         if next(pendingOperations) then
             DebugPrint("Processing pending tracker operations")
-            C_Timer.After(0.5, function()
+            C_Timer.After(1.0, function()
                 for name, operation in pairs(pendingOperations) do
                     if not InCombatLockdown() and operation.tracker then
                         if operation.action == "collapse" then
@@ -717,8 +736,9 @@ local function OnZoneChanged()
     end)
 
     -- Add an even longer delay to ensure all Blizzard systems are fully initialized
-    -- This prevents any chance of taint during critical system operations
-    C_Timer.After(5.0, function()
+    -- Wait 30+ seconds after zone change before touching quest log
+    -- This is critical to avoid interfering with quest system initialization
+    C_Timer.After(30.0, function()
         -- Double-check that we're not in combat before proceeding
         if InCombatLockdown() then
             DebugPrint("Skipping zone change handling - in combat")
@@ -728,7 +748,7 @@ local function OnZoneChanged()
         -- Additional check to avoid interference during map operations
         if mapSystemBusy then
             DebugPrint("Map system may be busy, deferring tracker operations")
-            C_Timer.After(3.0, function()
+            C_Timer.After(5.0, function()
                 if not InCombatLockdown() then
                     local inInstance, instanceType = IsInInstance()
                     DebugPrint("Deferred instance check: inInstance=" .. tostring(inInstance) .. ", type=" .. tostring(instanceType))
@@ -771,10 +791,12 @@ local function OnAddonLoaded(addonName)
     end
 
     print("|cff00ff00QuestLogCollapse|r v1.0.0 loaded. Type |cffff0000/qlc config|r for options.")
+    print("|cffff9900[QuestLogCollapse]|r Note: Some trackers (Quests, Bonus Objectives, World Quests) are disabled by default to prevent UI taint. Enable at your own risk.")
 
-    -- Check initial state with a much longer delay to avoid conflicts during addon loading
+    -- Check initial state with a MUCH longer delay to avoid conflicts during addon loading
     -- Give the map system and all other Blizzard systems plenty of time to fully initialize
-    C_Timer.After(8.0, function()
+    -- At least 30+ seconds is needed to ensure quest system is ready
+    C_Timer.After(30.0, function()
         if IsInDungeon() then
             local profile = GetCurrentQLCProfile and GetCurrentQLCProfile() or QuestLogCollapseDB
             if profile and profile.enabled and not InCombatLockdown() then
@@ -1067,9 +1089,6 @@ QuestLogCollapse:SetScript("OnEvent", function(self, event, ...)
         DebugPrint("Player entered world - addon fully loaded")
     elseif event == "ZONE_CHANGED_NEW_AREA" then
         OnZoneChanged()
-    elseif event == "PLAYER_ENTER_COMBAT" then
-        -- Handle early combat detection (fires before PLAYER_REGEN_DISABLED)
-        OnEarlyCombat(event)
     elseif event == "PLAYER_REGEN_DISABLED" or event == "PLAYER_REGEN_ENABLED" then
         -- Handle combat options
         OnCombatStateChanged(event)
