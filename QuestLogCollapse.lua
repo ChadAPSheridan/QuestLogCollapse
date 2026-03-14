@@ -1,14 +1,16 @@
 -- QuestLogCollapse: Automatically collapses quest log when entering dungeons
--- Author: YourName
--- Version: 1.1.0
---
--- TAINT PROTECTION STRATEGY:
--- 1. Uses extremely conservative timing to avoid quest system initialization
--- 2. Never manipulates UI during the critical 15+ second period after zone change
--- 3. Avoids all direct tracker manipulation that could cause taint
--- 4. Suppresses global error handler modification (causes more problems than it solves)
--- 5. Uses deferred execution with very long delays to ensure quest system is idle
+-- Author: Gaspode
+-- Version: 1.3
 
+-- TAINT PROTECTION STRATEGY:
+-- Implemented namespace to avoid global variable pollution
+-- Added extensive error handling and logging to detect and isolate taint issues
+-- If this resolves taint issues, will remove previous mitigation strategies (disabling collapsing of certain trackers) in future updates
+
+-- Use addon namespace to prevent global variable pollution and taint
+local addonName, ns = ...
+
+-- Create addon frame (local to prevent global pollution)
 local QuestLogCollapse = CreateFrame("Frame")
 QuestLogCollapse:RegisterEvent("ADDON_LOADED")
 QuestLogCollapse:RegisterEvent("ZONE_CHANGED_NEW_AREA")
@@ -19,12 +21,12 @@ QuestLogCollapse:RegisterEvent("PLAYER_ENTERING_WORLD")
 -- Trackers that cause taint issues - don't attempt to collapse these
 -- This list is updated dynamically when taint is detected
 local TAINT_BLACKLIST = {
-    UIWidgetObjectiveTracker = true,
-    AdventureMapQuestObjectiveTracker = true,
-    QuestDataProvider = true,
-    QuestObjectiveTracker = true,  -- Causes widget taint
-    WorldQuestObjectiveTracker = true,  -- Causes map system taint
-    BonusObjectiveTracker = true,  -- Causes area POI taint
+    -- UIWidgetObjectiveTracker = true,
+    -- AdventureMapQuestObjectiveTracker = true,
+    -- QuestDataProvider = true,
+    -- QuestObjectiveTracker = true,  -- Causes widget taint
+    -- WorldQuestObjectiveTracker = true,  -- Causes map system taint
+    -- BonusObjectiveTracker = true,  -- Causes area POI taint
 }
 
 -- Helper function to check if a value is tainted
@@ -71,49 +73,8 @@ busyFrame:SetScript("OnUpdate", function()
     CheckMapSystemBusy()
 end)
 
--- Wrap collapse/expand calls
-local function DeferOrRun(action, func)
-    if mapSystemBusy then
-        table.insert(pendingOperations, {action = action, func = func})
-    else
-        func()
-    end
-end
-
--- Patch CollapseQuestLog and ExpandQuestLog
-local oldCollapse = CollapseQuestLog
-function CollapseQuestLog()
-    DeferOrRun("collapse", function() oldCollapse() end)
-end
-
-local oldExpand = ExpandQuestLog
-function ExpandQuestLog()
-    DeferOrRun("expand", function() oldExpand() end)
-end
-
--- Patch zone change and initial load to set busy window
-local oldOnZoneChanged = OnZoneChanged
-function OnZoneChanged(...)
-    SetMapSystemBusy(12)
-    oldOnZoneChanged(...)
-end
-
-local oldOnAddonLoaded = OnAddonLoaded
-function OnAddonLoaded(addonName, ...)
-    if addonName == "QuestLogCollapse" then
-        SetMapSystemBusy(15)
-    end
-    oldOnAddonLoaded(addonName, ...)
-end
-
--- Track if we're in the middle of map system operations to avoid interference
-local mapSystemBusy = false
-
 -- Track loading state to prevent operations during initialization
 local isFullyLoaded = false
-
--- Track which operations are pending to avoid conflicts
-local pendingOperations = {}
 
 -- Track combat state for delayed operations
 local combatStateQueue = {
@@ -156,12 +117,15 @@ local defaults = {
 -- Initialize saved variables
 QuestLogCollapseDB = QuestLogCollapseDB or {}
 
-function DebugPrint(message)
-    local profile = GetCurrentQLCProfile and GetCurrentQLCProfile() or QuestLogCollapseDB
+-- Debug print function (stored in namespace)
+local function DebugPrint(message)
+    local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or QuestLogCollapseDB
     if profile and profile.debug then
         print("|cff00ff00[QuestLogCollapse]|r " .. message)
     end
 end
+-- Make DebugPrint available to other addon files via namespace
+ns.DebugPrint = DebugPrint
 
 local function IsInDungeon()
     local instanceType = select(2, IsInInstance())
@@ -272,7 +236,7 @@ local function CollapseQuestLog()
     end
     
     -- Get instance-specific settings from config system
-    local settings = GetCurrentInstanceSettings and GetCurrentInstanceSettings()
+    local settings = ns.GetCurrentInstanceSettings and ns.GetCurrentInstanceSettings()
 
     DebugPrint("CollapseQuestLog() called")
 
@@ -561,7 +525,7 @@ local function FilterQuestsByZone()
         return
     end
     
-    local profile = GetCurrentQLCProfile and GetCurrentQLCProfile() or QuestLogCollapseDB
+    local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or QuestLogCollapseDB
     if not profile or not profile.filterQuestsByZone then
         return
     end
@@ -696,7 +660,7 @@ local function FilterQuestsByZone()
 end
 
 local function OnZoneChanged()
-    local profile = GetCurrentQLCProfile and GetCurrentQLCProfile() or QuestLogCollapseDB
+    local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or QuestLogCollapseDB
     
     -- Always check for zone-based quest filtering (regardless of instance status)
     FilterQuestsByZone()
@@ -798,7 +762,7 @@ local function OnAddonLoaded(addonName)
     -- At least 30+ seconds is needed to ensure quest system is ready
     C_Timer.After(30.0, function()
         if IsInDungeon() then
-            local profile = GetCurrentQLCProfile and GetCurrentQLCProfile() or QuestLogCollapseDB
+            local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or QuestLogCollapseDB
             if profile and profile.enabled and not InCombatLockdown() then
                 DebugPrint("Initial state check: in dungeon, applying collapse")
                 CollapseQuestLog()
@@ -808,7 +772,7 @@ local function OnAddonLoaded(addonName)
 end
 
 local function OnCombatStateChanged(event)
-    local profile = GetCurrentQLCProfile and GetCurrentQLCProfile() or QuestLogCollapseDB
+    local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or QuestLogCollapseDB
     if not profile or not profile.enabled then
         DebugPrint("Addon disabled or no profile found")
         return
@@ -818,7 +782,7 @@ local function OnCombatStateChanged(event)
     if not IsInDungeon() then
         if event == "PLAYER_REGEN_DISABLED" then
             -- Check if combat collapse is enabled
-            local settings = GetCurrentInstanceSettings and GetCurrentInstanceSettings()
+            local settings = ns.GetCurrentInstanceSettings and ns.GetCurrentInstanceSettings()
             if settings and settings.enabled then
                 DebugPrint("PLAYER_REGEN_DISABLED fired - checking if early combat already handled collapse")
                 
@@ -943,7 +907,7 @@ local function OnCombatStateChanged(event)
             elseif combatStateQueue.enteredCombatOutsideInstance and combatStateQueue.trackersWereCollapsedInCombat then
                 -- If we were in combat outside instances and trackers were collapsed,
                 -- expand the quest log when combat ends to restore original state
-                local settings = GetCurrentInstanceSettings and GetCurrentInstanceSettings()
+                local settings = ns.GetCurrentInstanceSettings and ns.GetCurrentInstanceSettings()
                 if settings and settings.enabled then
                     DebugPrint("Combat ended outside instance - expanding quest log to restore original state")
                     ExpandQuestLog()
@@ -966,7 +930,7 @@ end
 
 -- Early combat detection - this fires before PLAYER_REGEN_DISABLED
 local function OnEarlyCombat(event)
-    local profile = GetCurrentQLCProfile and GetCurrentQLCProfile() or QuestLogCollapseDB
+    local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or QuestLogCollapseDB
     if not profile or not profile.enabled then
         DebugPrint("Addon disabled or no profile found")
         return
@@ -976,7 +940,7 @@ local function OnEarlyCombat(event)
     if not IsInDungeon() then
         if event == "PLAYER_ENTER_COMBAT" then
             -- Check if combat collapse is enabled
-            local settings = GetCurrentInstanceSettings and GetCurrentInstanceSettings()
+            local settings = ns.GetCurrentInstanceSettings and ns.GetCurrentInstanceSettings()
             if settings and settings.enabled then
                 DebugPrint("Early combat detection (PLAYER_ENTER_COMBAT) - attempting immediate collapse")
                 
@@ -1082,12 +1046,16 @@ end
 -- Event handler
 QuestLogCollapse:SetScript("OnEvent", function(self, event, ...)
     if event == "ADDON_LOADED" then
-        OnAddonLoaded(...)
+        local addonName = ...
+        if addonName == "QuestLogCollapse" then
+            SetMapSystemBusy(15)
+        end
     elseif event == "PLAYER_ENTERING_WORLD" then
         -- Mark as fully loaded after player enters world
         isFullyLoaded = true
         DebugPrint("Player entered world - addon fully loaded")
     elseif event == "ZONE_CHANGED_NEW_AREA" then
+        SetMapSystemBusy(30)
         OnZoneChanged()
     elseif event == "PLAYER_REGEN_DISABLED" or event == "PLAYER_REGEN_ENABLED" then
         -- Handle combat options
@@ -1142,20 +1110,20 @@ function SlashCmdList.QUESTLOGCOLLAPSE(msg)
         print("Available sections: quests, achievements, bonus, scenarios,")
         print("campaigns, professions, monthly, widgets, adventuremaps")
     elseif args[1] == "toggle" then
-        local profile = GetCurrentQLCProfile and GetCurrentQLCProfile() or QuestLogCollapseDB
+        local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or QuestLogCollapseDB
         if profile then
             profile.enabled = not profile.enabled
             print("|cff00ff00QuestLogCollapse|r " .. (profile.enabled and "enabled" or "disabled"))
         end
     elseif args[1] == "debug" then
-        local profile = GetCurrentQLCProfile and GetCurrentQLCProfile() or QuestLogCollapseDB
+        local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or QuestLogCollapseDB
         if profile then
             profile.debug = not profile.debug
             print("|cff00ff00QuestLogCollapse|r debug " .. (profile.debug and "enabled" or "disabled"))
         end
     elseif args[1] == "config" then
-        if CreateQuestLogCollapseConfigPanel then
-            local configPanel = CreateQuestLogCollapseConfigPanel()
+        if ns.CreateQuestLogCollapseConfigPanel then
+            local configPanel = ns.CreateQuestLogCollapseConfigPanel()
             if Settings and Settings.OpenToCategory then
                 -- Try to register and open in the new settings system
                 if not configPanel.categoryID then
@@ -1180,14 +1148,14 @@ function SlashCmdList.QUESTLOGCOLLAPSE(msg)
             print("|cff00ff00QuestLogCollapse|r Configuration panel not available.")
         end
     elseif args[1] == "status" then
-        local profile = GetCurrentQLCProfile and GetCurrentQLCProfile() or QuestLogCollapseDB
+        local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or QuestLogCollapseDB
         print("|cff00ff00QuestLogCollapse Status:|r")
         print("Enabled: " .. ((profile and profile.enabled) and "Yes" or "No"))
         print("Debug: " .. ((profile and profile.debug) and "Yes" or "No"))
         print("In Instance: " .. (IsInDungeon() and "Yes" or "No"))
         print("In Combat: " .. (InCombatLockdown() and "Yes" or "No"))
 
-        local settings = GetCurrentInstanceSettings and GetCurrentInstanceSettings()
+        local settings = ns.GetCurrentInstanceSettings and ns.GetCurrentInstanceSettings()
         if settings then
             local instanceType = select(2, IsInInstance())
         print("Current Instance Settings (" .. (instanceType or "none") .. "):")
@@ -1254,7 +1222,7 @@ function SlashCmdList.QUESTLOGCOLLAPSE(msg)
         local inInstance, instanceType = IsInInstance()
         print("In Instance: " .. tostring(inInstance) .. ", Type: " .. tostring(instanceType))
         print("IsInDungeon(): " .. tostring(IsInDungeon()))
-        local settings = GetCurrentInstanceSettings and GetCurrentInstanceSettings()
+        local settings = ns.GetCurrentInstanceSettings and ns.GetCurrentInstanceSettings()
         print("Current Instance Settings: " .. (settings and "Found" or "Not found"))
         if settings then
             print("  Settings enabled: " .. tostring(settings.enabled))
@@ -1266,7 +1234,7 @@ function SlashCmdList.QUESTLOGCOLLAPSE(msg)
         print("  Trackers Collapsed in Combat: " .. (combatStateQueue.trackersWereCollapsedInCombat and "Yes" or "No"))
     elseif args[1] == "testcombat" then
         print("|cff00ff00QuestLogCollapse Combat Test:|r")
-        local settings = GetCurrentInstanceSettings and GetCurrentInstanceSettings()
+        local settings = ns.GetCurrentInstanceSettings and ns.GetCurrentInstanceSettings()
         if settings then
             print("Combat Settings Found: " .. (settings.enabled and "Enabled" or "Disabled"))
             if settings.enabled then

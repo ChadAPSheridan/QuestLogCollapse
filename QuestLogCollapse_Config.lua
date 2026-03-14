@@ -1,6 +1,9 @@
 -- QuestLogCollapse Configuration Panel
 -- Author: Gaspode
--- Version: 1.0.0
+-- Version: 1.3
+
+-- Use addon namespace to prevent global variable pollution and taint
+local addonName, ns = ...
 
 local QLC = QuestLogCollapseDB or {}
 
@@ -207,41 +210,44 @@ local function getProfile()
     return QuestLogCollapseDB.profiles[QuestLogCollapseCharDB.currentProfile] or getDefaultProfile()
 end
 
--- Define the new profile popup
-if not StaticPopupDialogs["QUESTLOGCOLLAPSE_NEW_PROFILE"] then
-    StaticPopupDialogs["QUESTLOGCOLLAPSE_NEW_PROFILE"] = {
-        text = "Enter new profile name:",
-        button1 = "Create",
-        button2 = "Cancel",
-        hasEditBox = true,
-        maxLetters = 32,
-        OnAccept = function(self)
-            local editBox = self.editBox or self.EditBox
-            local name = editBox and editBox:GetText():gsub("^%s+", ""):gsub("%s+$", "") or ""
-            if name == "" then return end
-            if QuestLogCollapseDB.profiles[name] then
-                print("|cffff0000QuestLogCollapse|r Profile already exists.")
-                return
-            end
-            QuestLogCollapseDB.profiles[name] = getDefaultProfile()
-            QuestLogCollapseCharDB.currentProfile = name
-            if _G.RefreshQLCProfileDropdown then
-                _G.RefreshQLCProfileDropdown()
-            end
-            print("|cff00ff00QuestLogCollapse|r Created profile: " .. name)
-        end,
-        timeout = 0,
-        whileDead = true,
-        exclusive = true,
-        hideOnEscape = true,
-        preferredIndex = 3,
-    }
-end
-
 local panel
 
-function CreateQuestLogCollapseConfigPanel()
+local function CreateQuestLogCollapseConfigPanel()
     if panel then return panel end
+
+    -- Define the new profile popup (do this once when panel is created)
+    if not StaticPopupDialogs["QUESTLOGCOLLAPSE_NEW_PROFILE"] then
+        -- Will use local RefreshQLCProfileDropdown via upvalue
+        local refreshFunc = nil  -- Will be set later
+        
+        StaticPopupDialogs["QUESTLOGCOLLAPSE_NEW_PROFILE"] = {
+            text = "Enter new profile name:",
+            button1 = "Create",
+            button2 = "Cancel",
+            hasEditBox = true,
+            maxLetters = 32,
+            OnAccept = function(self)
+                local editBox = self.editBox or self.EditBox
+                local name = editBox and editBox:GetText():gsub("^%s+", ""):gsub("%s+$", "") or ""
+                if name == "" then return end
+                if QuestLogCollapseDB.profiles[name] then
+                    print("|cffff0000QuestLogCollapse|r Profile already exists.")
+                    return
+                end
+                QuestLogCollapseDB.profiles[name] = getDefaultProfile()
+                QuestLogCollapseCharDB.currentProfile = name
+                if refreshFunc then
+                    refreshFunc()
+                end
+                print("|cff00ff00QuestLogCollapse|r Created profile: " .. name)
+            end,
+            timeout = 0,
+            whileDead = true,
+            exclusive = true,
+            hideOnEscape = true,
+            preferredIndex = 3,
+        }
+    end
 
     panel = CreateFrame("Frame", "QuestLogCollapseConfigPanel", UIParent, "BackdropTemplate")
     panel.name = "QuestLogCollapse"
@@ -415,8 +421,8 @@ function CreateQuestLogCollapseConfigPanel()
         yOffset = yOffset - 90
     end
 
-    -- Profile dropdown refresh function
-    function RefreshQLCProfileDropdown()
+    -- Profile dropdown refresh function (local, not global)
+    local function RefreshQLCProfileDropdown()
         if not QuestLogCollapseDB or not QuestLogCollapseDB.profiles or not QuestLogCollapseCharDB then
             return
         end
@@ -438,8 +444,26 @@ function CreateQuestLogCollapseConfigPanel()
         end)
         UIDropDownMenu_SetSelectedValue(profileDD, QuestLogCollapseCharDB.currentProfile)
     end
-
-    _G.RefreshQLCProfileDropdown = RefreshQLCProfileDropdown
+    
+    -- Set the refresh function for the popup dialog to use
+    if StaticPopupDialogs["QUESTLOGCOLLAPSE_NEW_PROFILE"] then
+        -- Access the OnAccept function's upvalue
+        local popup = StaticPopupDialogs["QUESTLOGCOLLAPSE_NEW_PROFILE"]
+        local oldAccept = popup.OnAccept
+        popup.OnAccept = function(self)
+            local editBox = self.editBox or self.EditBox
+            local name = editBox and editBox:GetText():gsub("^%s+", ""):gsub("%s+$", "") or ""
+            if name == "" then return end
+            if QuestLogCollapseDB.profiles[name] then
+                print("|cffff0000QuestLogCollapse|r Profile already exists.")
+                return
+            end
+            QuestLogCollapseDB.profiles[name] = getDefaultProfile()
+            QuestLogCollapseCharDB.currentProfile = name
+            RefreshQLCProfileDropdown()  -- Use local function
+            print("|cff00ff00QuestLogCollapse|r Created profile: " .. name)
+        end
+    end
 
     -- Update panel on show
     panel.OnShow = function()
@@ -529,7 +553,7 @@ configEventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 local panelRegistered = false
 
 -- Cleanup on profile switch
-function SwitchProfile(profileName)
+local function SwitchProfile(profileName)
     QuestLogCollapseCharDB.currentProfile = profileName
     -- Clear any unused references
     if panel and panel.OnShow then
@@ -555,26 +579,34 @@ configEventFrame:SetScript("OnEvent", function(self, event, addonName)
     end
 end)
 
--- Global function to get current instance settings (used by main addon)
-function GetCurrentInstanceSettings()
+-- Local function to get current instance settings (used by main addon via namespace)
+local function GetCurrentInstanceSettings()
     local prof = getProfile()
     if not prof then return nil end
 
     local instanceType = select(2, IsInInstance())
-    DebugPrint("Current instance type: " .. tostring(instanceType))
+    if ns.DebugPrint then 
+        ns.DebugPrint("Current instance type: " .. tostring(instanceType))
+    end
     if instanceType == "party" then
         local isInGarrison = C_Garrison.IsPlayerInGarrison(Enum.GarrisonType.Type_6_0_Garrison)
         local isInClassHall = C_Garrison.IsPlayerInGarrison(Enum.GarrisonType.Type_7_0_Garrison)
         local isAtQuestTable = C_Garrison.IsAtGarrisonMissionNPC() or
             C_Garrison.IsPlayerInGarrison(Enum.GarrisonType.Type_8_0_Garrison)
         if isInGarrison then
-            DebugPrint("Player is in a garrison")
+            if ns.DebugPrint then
+                ns.DebugPrint("Player is in a garrison")
+            end
             return prof.garrisons
         elseif isInClassHall then
-            DebugPrint("Player is in a class hall")
+            if ns.DebugPrint then
+                ns.DebugPrint("Player is in a class hall")
+            end
             return prof.classHalls
         elseif isAtQuestTable then
-            DebugPrint("Player is at a quest table")
+            if ns.DebugPrint then
+                ns.DebugPrint("Player is at a quest table")
+            end
             return prof.questTables
         else
             return prof.dungeons
@@ -598,7 +630,13 @@ function GetCurrentInstanceSettings()
     return nil
 end
 
--- Global function to get current profile (used by main addon)
-function GetCurrentQLCProfile()
+-- Local function to get current profile (used by main addon via namespace)
+local function GetCurrentQLCProfile()
     return getProfile()
 end
+
+-- Export functions to namespace for use by main addon file
+ns.CreateQuestLogCollapseConfigPanel = CreateQuestLogCollapseConfigPanel
+ns.GetCurrentInstanceSettings = GetCurrentInstanceSettings
+ns.GetCurrentQLCProfile = GetCurrentQLCProfile
+ns.SwitchProfile = SwitchProfile

@@ -232,6 +232,11 @@ This project is open source. Feel free to modify and distribute as needed.
 
 ## Changelog
 
+### Version 1.3
+
+- **Taint Issues Resolved!!!:** Implemented [namespacing](https://warcraft.wiki.gg/wiki/Using_the_AddOn_namespace) throughout entire addon to resolve secret variable taint issues.
+- If this completely resolves taint issues, will remove previous mitigation strategies (disabling collapsing of certain trackers, setting delays etc.) in the next update, but wanted to get this into user's hands asap.
+
 ### Version 1.2.7
 
 - **Zone Filtering Added**: You can now enable the option to have quests tracked and untracked based on your current zone.
