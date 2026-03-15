@@ -1,6 +1,6 @@
 -- QuestLogCollapse Configuration Panel
 -- Author: Gaspode
--- Version: 1.3
+-- Version: 1.3.1
 
 -- Use addon namespace to prevent global variable pollution and taint
 local addonName, ns = ...

@@ -1,6 +1,6 @@
 -- QuestLogCollapse: Automatically collapses quest log when entering dungeons
 -- Author: Gaspode
--- Version: 1.3
+-- Version: 1.3.1
 
 -- TAINT PROTECTION STRATEGY:
 -- Implemented namespace to avoid global variable pollution
@@ -17,6 +17,9 @@ QuestLogCollapse:RegisterEvent("ZONE_CHANGED_NEW_AREA")
 QuestLogCollapse:RegisterEvent("PLAYER_REGEN_DISABLED")
 QuestLogCollapse:RegisterEvent("PLAYER_REGEN_ENABLED")
 QuestLogCollapse:RegisterEvent("PLAYER_ENTERING_WORLD")
+QuestLogCollapse:RegisterEvent("PLAYER_STARTED_MOVING")
+QuestLogCollapse:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+QuestLogCollapse:RegisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
 
 -- Trackers that cause taint issues - don't attempt to collapse these
 -- This list is updated dynamically when taint is detected
@@ -95,6 +98,10 @@ local questTrackingState = {
     originalTrackedQuests = {}, -- Store original tracked quest IDs
     addonModifiedTracking = false -- Whether the addon has modified quest tracking
 }
+
+-- Track if zone filtering is needed (set on zone change, cleared when filtering runs)
+-- This flag approach allows the filter to run from hardware-initiated events without taint
+local needsZoneFilter = false
 
 -- Default settings
 local defaults = {
@@ -517,7 +524,12 @@ local function ExpandQuestLog()
     end
 end
 
--- Filter quests by current zone (called on zone change)
+-- Filter quests by current zone
+-- This function is only safe to call from:
+-- 1. Slash commands (user-initiated)
+-- 2. Hardware-event hooks (map open, quest log open, player movement)
+-- 3. Frame OnShow events triggered by user action
+-- NEVER call from ZONE_CHANGED or other game events - it will cause taint!
 local function FilterQuestsByZone()
     -- NEVER do anything during combat to avoid taint
     if InCombatLockdown() then
@@ -527,8 +539,12 @@ local function FilterQuestsByZone()
     
     local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or QuestLogCollapseDB
     if not profile or not profile.filterQuestsByZone then
+        needsZoneFilter = false  -- Clear the flag
         return
     end
+    
+    -- Clear the flag since we're running now
+    needsZoneFilter = false
     
     DebugPrint("========================================")
     DebugPrint("=== FILTERING QUESTS BY CURRENT ZONE ===")
@@ -662,8 +678,12 @@ end
 local function OnZoneChanged()
     local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or QuestLogCollapseDB
     
-    -- Always check for zone-based quest filtering (regardless of instance status)
-    FilterQuestsByZone()
+    -- Set flag for zone filtering - will be triggered by user action (map open, movement, etc.)
+    -- We can't call FilterQuestsByZone() directly here because it would cause taint
+    if profile and profile.filterQuestsByZone then
+        needsZoneFilter = true
+        DebugPrint("Zone changed - zone filter will run on next user action (open map, move, or use /qlc filterzone)")
+    end
     
     if not profile or not profile.enabled then
         DebugPrint("Addon disabled or no profile found (skipping collapse/expand)")
@@ -1060,6 +1080,27 @@ QuestLogCollapse:SetScript("OnEvent", function(self, event, ...)
     elseif event == "PLAYER_REGEN_DISABLED" or event == "PLAYER_REGEN_ENABLED" then
         -- Handle combat options
         OnCombatStateChanged(event)
+    elseif event == "PLAYER_STARTED_MOVING" then
+        -- Player movement - check for pending zone filter
+        -- This is typically hardware-initiated (WASD keys)
+        if needsZoneFilter and not InCombatLockdown() then
+            DebugPrint("Player started moving - running pending zone filter")
+            FilterQuestsByZone()
+        end
+    elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
+        local unitTarget, castGUID, spellID = ...
+        -- Only respond to player's own spells
+        if unitTarget == "player" and needsZoneFilter and not InCombatLockdown() then
+            DebugPrint("Player cast spell/ability - running pending zone filter")
+            FilterQuestsByZone()
+        end
+    elseif event == "PLAYER_MOUNT_DISPLAY_CHANGED" then
+        -- Player mounted/dismounted - check for pending zone filter
+        -- Mounting is always hardware-initiated (button press)
+        if needsZoneFilter and not InCombatLockdown() then
+            DebugPrint("Player mount state changed - running pending zone filter")
+            FilterQuestsByZone()
+        end
     end
 end)
 
@@ -1096,6 +1137,7 @@ function SlashCmdList.QUESTLOGCOLLAPSE(msg)
         print("|cffff0000/qlc status|r - Show current status and combat queue")
         print("|cffff0000/qlc collapse|r - Manually collapse configured sections")
         print("|cffff0000/qlc expand|r - Manually expand all collapsed sections")
+        print("|cffff0000/qlc filterzone|r - Filter quests by current zone (manual)")
         print("|cffff0000/qlc test|r - Test objective tracker detection")
         print("|cffff0000/qlc testcombat|r - Test combat collapse behavior")
         print("|cffff0000/qlc clearpending|r - Clear pending tracker operations")
@@ -1107,6 +1149,15 @@ function SlashCmdList.QUESTLOGCOLLAPSE(msg)
         print("• Quest trackers automatically expand when combat ends (outside instances)")
         print("• If immediate collapse fails, operations are queued for when combat ends")
         print("• Use |cffff0000/qlc expand|r during combat to cancel queued operations")
+        print("")
+        print("|cff00ff00Zone Filtering:|r")
+        print("• When enabled, zone filtering triggers automatically when you:")
+        print("  - Open the world map")
+        print("  - Open the quest log")
+        print("  - Start moving after a zone change")
+        print("  - Cast any spell/ability (including dynamic flight)")
+        print("  - Mount or dismount")
+        print("• You can also manually trigger with |cffff0000/qlc filterzone|r")
         print("Available sections: quests, achievements, bonus, scenarios,")
         print("campaigns, professions, monthly, widgets, adventuremaps")
     elseif args[1] == "toggle" then
@@ -1152,6 +1203,8 @@ function SlashCmdList.QUESTLOGCOLLAPSE(msg)
         print("|cff00ff00QuestLogCollapse Status:|r")
         print("Enabled: " .. ((profile and profile.enabled) and "Yes" or "No"))
         print("Debug: " .. ((profile and profile.debug) and "Yes" or "No"))
+        print("Filter Quests by Zone: " .. ((profile and profile.filterQuestsByZone) and "Yes" or "No"))
+        print("Zone Filter Pending: " .. (needsZoneFilter and "Yes" or "No"))
         print("In Instance: " .. (IsInDungeon() and "Yes" or "No"))
         print("In Combat: " .. (InCombatLockdown() and "Yes" or "No"))
 
@@ -1209,6 +1262,19 @@ function SlashCmdList.QUESTLOGCOLLAPSE(msg)
         else
             ExpandQuestLog()
             print("|cff00ff00QuestLogCollapse|r manually expanded all collapsed sections")
+        end
+    elseif args[1] == "filterzone" then
+        -- Manual zone filter trigger (always safe from slash command)
+        if InCombatLockdown() then
+            print("|cff00ff00QuestLogCollapse|r Cannot filter quests during combat")
+        else
+            local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or QuestLogCollapseDB
+            if profile and profile.filterQuestsByZone then
+                FilterQuestsByZone()
+                print("|cff00ff00QuestLogCollapse|r Quest filtering by zone completed")
+            else
+                print("|cff00ff00QuestLogCollapse|r Zone filtering is not enabled. Enable it in /qlc config")
+            end
         end
     elseif args[1] == "test" then
         print("|cff00ff00QuestLogCollapse Test Results:|r")
@@ -1279,3 +1345,91 @@ function SlashCmdList.QUESTLOGCOLLAPSE(msg)
         print("|cff00ff00QuestLogCollapse|r Unknown command. Type |cffff0000/qlc help|r for available commands.")
     end
 end
+
+-- ============================================================================
+-- ZONE FILTERING AUTOMATIC TRIGGERS (Hardware-Event Hooks)
+-- ============================================================================
+-- These hooks allow zone filtering to run in response to user actions,
+-- which breaks the taint chain from game events like ZONE_CHANGED_NEW_AREA
+
+-- Helper function to check flag and run filter if needed
+local function TryRunZoneFilter()
+    if needsZoneFilter and not InCombatLockdown() then
+        DebugPrint("User action detected - running pending zone filter")
+        FilterQuestsByZone()
+    end
+end
+
+-- Hook World Map opening (hardware-initiated: key press or mouse click)
+-- The world map can be shown through multiple interfaces in modern WoW
+C_Timer.After(1, function()
+    -- WorldMapFrame might not exist immediately, retry until it does
+    local function HookWorldMap()
+        if WorldMapFrame then
+            if not WorldMapFrame.qlcHooked then
+                WorldMapFrame:HookScript("OnShow", function()
+                    DebugPrint("World map opened - checking for pending zone filter")
+                    TryRunZoneFilter()
+                end)
+                WorldMapFrame.qlcHooked = true
+                DebugPrint("Hooked WorldMapFrame for zone filtering")
+            end
+            return true
+        end
+        return false
+    end
+    
+    -- Try hooking immediately
+    if not HookWorldMap() then
+        -- If WorldMapFrame doesn't exist yet, keep trying
+        local attempts = 0
+        local ticker = C_Timer.NewTicker(1, function()
+            attempts = attempts + 1
+            if HookWorldMap() or attempts > 30 then
+                ticker:Cancel()
+            end
+        end)
+    end
+end)
+
+-- Hook Quest Log / Objective Tracker interaction
+C_Timer.After(1, function()
+    local function HookQuestLog()
+        -- Modern WoW uses ObjectiveTrackerFrame
+        if ObjectiveTrackerFrame then
+            if not ObjectiveTrackerFrame.qlcHooked then
+                -- Hook the minimize/maximize button click which is hardware-initiated
+                if ObjectiveTrackerFrame.HeaderMenu and ObjectiveTrackerFrame.HeaderMenu.MinimizeButton then
+                    ObjectiveTrackerFrame.HeaderMenu.MinimizeButton:HookScript("OnMouseDown", function()
+                        DebugPrint("Quest tracker interacted with - checking for pending zone filter")
+                        TryRunZoneFilter()
+                    end)
+                end
+                ObjectiveTrackerFrame.qlcHooked = true
+                DebugPrint("Hooked ObjectiveTrackerFrame for zone filtering")
+            end
+            return true
+        end
+        return false
+    end
+    
+    -- Try hooking immediately
+    if not HookQuestLog() then
+        -- If ObjectiveTrackerFrame doesn't exist yet, keep trying
+        local attempts = 0
+        local ticker = C_Timer.NewTicker(1, function()
+            attempts = attempts + 1
+            if HookQuestLog() or attempts > 30 then
+                ticker:Cancel()
+            end
+        end)
+    end
+end)
+
+DebugPrint("QuestLogCollapse: Zone filtering hooks initialized")
+DebugPrint("  - World map opening will trigger pending filters")
+DebugPrint("  - Quest tracker interaction will trigger pending filters")
+DebugPrint("  - Player movement will trigger pending filters")
+DebugPrint("  - Spell/ability cast will trigger pending filters")
+DebugPrint("  - Mounting/dismounting will trigger pending filters")
+DebugPrint("  - Manual trigger: /qlc filterzone")
