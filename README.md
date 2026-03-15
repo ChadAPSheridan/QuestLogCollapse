@@ -1,6 +1,7 @@
 # QuestLogCollapse
 
 A World of Warcraft addon that automatically collapses the quest log when entering dungeons, raids, or combat situations.
+Optionally can filter quests to current zone (triggered by user actions to avoid taint).
 **Please Note: This addon does not work with client versions < 10.0**
 
 ## Features
@@ -38,6 +39,7 @@ The addon provides several slash commands for basic control:
 - `/qlc status` - Show current addon status, combat queue, and section states
 - `/qlc collapse` - Manually collapse configured sections (queued during combat)
 - `/qlc expand` - Manually expand configured sections (cancels combat queue)
+- `/qlc filterzone` - Manually filter quests by current zone (if enabled in settings)
 - `/qlc test` - Test objective tracker detection and combat queue status
 - `/qlc testcombat` - Test combat settings and tracker availability
 - `/qlc help` - Show all available commands
@@ -58,7 +60,7 @@ The addon features a comprehensive configuration panel accessible via `/qlc conf
 ### Global Settings
 
 - `Enable QuestLogCollapse` (default: true) - Whether the addon is active
-- `Filter Quests by Current Zone` (default: false) - Track/Untrack quests in your current zone.
+- `Filter Quests by Current Zone` (default: false) - Track/Untrack quests in your current zone when you open the map, move, use an ability, mount/dismount, or use `/qlc filterzone`
 - `Debug Mode` (default: false) - Whether to show debug messages
 
 ### Profile Management
@@ -151,10 +153,24 @@ QuestLogCollapse/
 
 - `ADDON_LOADED` - Initialize settings when addon loads
 - `PLAYER_ENTERING_WORLD` - Mark addon as fully loaded and ready
-- `ZONE_CHANGED_NEW_AREA` - Detect when player changes zones/instances
+- `ZONE_CHANGED_NEW_AREA` - Detect when player changes zones/instances (sets flag for zone filtering)
+- `PLAYER_STARTED_MOVING` - Triggers pending zone filter when player moves (hardware-initiated)
+- `UNIT_SPELLCAST_SUCCEEDED` - Triggers pending zone filter when player casts spells/abilities (hardware-initiated)
+- `PLAYER_MOUNT_DISPLAY_CHANGED` - Triggers pending zone filter when mounting/dismounting (hardware-initiated)
 - `PLAYER_ENTER_COMBAT` - Early combat detection for immediate collapse (before taint protection)
 - `PLAYER_REGEN_DISABLED` - Handle entering combat (fallback immediate collapse or queue operations)
 - `PLAYER_REGEN_ENABLED` - Handle leaving combat (apply queued operations)
+
+### Zone Filtering Triggers (Taint-Safe)
+
+To avoid taint issues with protected quest tracking functions, zone filtering is triggered by user-initiated actions:
+
+- **World Map Opening** - Automatically triggers when you open the world map
+- **Quest Tracker Interaction** - Triggers when you interact with the objective tracker
+- **Player Movement** - Triggers when you start moving after a zone change
+- **Spell/Ability Use** - Triggers when you cast any spell or ability (including dynamic flight abilities)
+- **Mounting/Dismounting** - Triggers when your mount state changes
+- **Manual Command** - Use `/qlc filterzone` to trigger anytime
 
 ### Database Structure
 
@@ -188,9 +204,11 @@ QuestLogCollapse/
 
 ### Addon Taint Issues
 
-1. The addon now uses a combat queue system to prevent taint
-2. If you see "ADDON_ACTION_BLOCKED" errors, ensure you're using the latest version
-3. Operations during combat are queued and applied safely when combat ends
+1. The addon uses a combat queue system to prevent taint from collapse operations
+2. Zone filtering uses a hybrid trigger system (user actions) to avoid taint from protected quest tracking functions
+3. If you see "ADDON_ACTION_BLOCKED" errors with zone filtering:
+   - The filter requires a user action after zone changes (open map, move, or use `/qlc filterzone`)
+   - This is by design to comply with WoW's taint protection system
 4. Use `/qlc expand` during combat to cancel problematic queued operations
 
 ### Addon Not Loading
@@ -231,6 +249,16 @@ Feel free to submit issues, feature requests, or pull requests to improve this a
 This project is open source. Feel free to modify and distribute as needed.
 
 ## Changelog
+
+### Version 1.3.1
+
+- **Zone Filtering Taint Fix**: Completely redesigned zone filtering to use hybrid trigger system
+  - Zone changes set a flag instead of immediately calling protected functions
+  - Filter automatically triggers on user actions (opening map, moving, using abilities, mount/unmount, quest tracker interaction)
+  - Added `/qlc filterzone` command for manual triggering
+  - Eliminates `ADDON_ACTION_BLOCKED` errors from quest tracking operations
+  - Now fully compatible with WoW's taint protection system
+- **Enhanced Documentation**: Updated README with clear explanation of zone filtering triggers
 
 ### Version 1.3
 
