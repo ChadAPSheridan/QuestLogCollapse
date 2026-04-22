@@ -250,6 +250,10 @@ This project is open source. Feel free to modify and distribute as needed.
 
 ## Changelog
 
+### Version 1.3.2
+
+- Update compatible version
+
 ### Version 1.3.1
 
 - **Zone Filtering Taint Fix**: Completely redesigned zone filtering to use hybrid trigger system
