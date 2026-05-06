@@ -165,7 +165,6 @@ QuestLogCollapse/
 
 To avoid taint issues with protected quest tracking functions, zone filtering is triggered by user-initiated actions:
 
-- **World Map Opening** - Automatically triggers when you open the world map
 - **Quest Tracker Interaction** - Triggers when you interact with the objective tracker
 - **Player Movement** - Triggers when you start moving after a zone change
 - **Spell/Ability Use** - Triggers when you cast any spell or ability (including dynamic flight abilities)
