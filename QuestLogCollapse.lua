@@ -21,15 +21,24 @@ QuestLogCollapse:RegisterEvent("PLAYER_STARTED_MOVING")
 QuestLogCollapse:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
 QuestLogCollapse:RegisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
 
--- Trackers that cause taint issues - don't attempt to collapse these
--- This list is updated dynamically when taint is detected
+-- Trackers that must never be collapsed from addon Lua code.
+-- SetCollapsed() on any tracker that contains UIWidget-based content (status bars,
+-- capsules) causes UIWidgetManager:ProcessWidget → InitPartitions to run in a tainted
+-- execution context, which permanently taints the pooled StatusBar frame widths.
+-- Those poisoned widths then surface as "secret number" errors in LayoutFrame.lua
+-- and Blizzard_UIWidgetTemplateBase.lua whenever the GameTooltip or WorldMap later
+-- tries to lay out widget sets.  The pool frames are never size-reset on release,
+-- so the taint persists until /reload.
+--
+-- Keys here are the 'name' strings passed to SafeCollapseTracker/SafeExpandTracker.
+-- Dynamic per-session additions are also written here when a pcall catches a taint error.
 local TAINT_BLACKLIST = {
-    -- UIWidgetObjectiveTracker = true,
-    -- AdventureMapQuestObjectiveTracker = true,
-    -- QuestDataProvider = true,
-    -- QuestObjectiveTracker = true,  -- Causes widget taint
-    -- WorldQuestObjectiveTracker = true,  -- Causes map system taint
-    -- BonusObjectiveTracker = true,  -- Causes area POI taint
+    ["UI widgets"]          = true,  -- UIWidgetObjectiveTracker: directly manages widget pool frames
+    ["Monthly activities"]  = true,  -- MonthlyActivitiesObjectiveTracker: UIWidget status bars for seasonal/event progress
+    ["Adventure map"]      = true,  -- AdventureMapQuestObjectiveTracker: causes world map taint (collapseAdventureMaps defaults false; safety net for users who enable it)
+    ["World quest"]        = true,  -- WorldQuestObjectiveTracker: causes map system taint (collapseWorldQuests defaults false; safety net for users who enable it)
+    ["Bonus objectives"]   = true,  -- BonusObjectiveTracker: SetCollapsed taints UIWidget pool frame widths → LayoutFrame:491 "secret number" on Area POI tooltips
+    -- ["Quest"]            = true,  -- QuestObjectiveTracker: uncertain taint impact; collapseQuests defaults true for dungeons/raids so blacklisting would silently break the core feature — leave until a specific taint error is confirmed
 }
 
 -- Helper function to check if a value is tainted
