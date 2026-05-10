@@ -828,73 +828,35 @@ local function OnCombatStateChanged(event)
                 local collapsed = 0
                 
                 -- Attempt immediate collapse of each enabled tracker
-                if settings.collapseQuests and QuestObjectiveTracker then
-                    local ok, err = pcall(function()
-                        if QuestObjectiveTracker.SetCollapsed then
-                            QuestObjectiveTracker:SetCollapsed(true)
-                            collapsed = collapsed + 1
+                -- Trackers in TAINT_BLACKLIST are skipped here too, mirroring SafeCollapseTracker.
+                -- Without this gate, the immediate path bypasses the blacklist on collapse while
+                -- SafeExpandTracker still honors it on expand, leaving blacklisted trackers stuck
+                -- collapsed forever. See TAINT_BLACKLIST comments for the underlying taint chains.
+                local immediates = {
+                    { settings.collapseQuests,          QuestObjectiveTracker,         "Quest" },
+                    { settings.collapseAchievements,    AchievementObjectiveTracker,   "Achievement" },
+                    { settings.collapseBonusObjectives, BonusObjectiveTracker,         "Bonus objectives" },
+                    { settings.collapseCampaigns,       CampaignQuestObjectiveTracker, "Campaign" },
+                    { settings.collapseWorldQuests,     WorldQuestObjectiveTracker,    "World quest" },
+                }
+                for _, def in ipairs(immediates) do
+                    local wanted, tracker, name = def[1], def[2], def[3]
+                    if wanted and tracker then
+                        if TAINT_BLACKLIST[name] then
+                            DebugPrint("Skipping " .. name .. " immediate collapse - blacklisted (causes UI taint)")
+                        else
+                            local ok, err = pcall(function()
+                                if tracker.SetCollapsed then
+                                    tracker:SetCollapsed(true)
+                                    collapsed = collapsed + 1
+                                end
+                            end)
+                            if ok then
+                                DebugPrint(name .. " tracker immediately collapsed in combat")
+                            else
+                                DebugPrint("Failed to immediately collapse " .. name .. " tracker: " .. tostring(err))
+                            end
                         end
-                    end)
-                    if ok then
-                        DebugPrint("Quest tracker immediately collapsed in combat")
-                    else
-                        DebugPrint("Failed to immediately collapse quest tracker: " .. tostring(err))
-                    end
-                end
-                
-                if settings.collapseAchievements and AchievementObjectiveTracker then
-                    local ok, err = pcall(function()
-                        if AchievementObjectiveTracker.SetCollapsed then
-                            AchievementObjectiveTracker:SetCollapsed(true)
-                            collapsed = collapsed + 1
-                        end
-                    end)
-                    if ok then
-                        DebugPrint("Achievement tracker immediately collapsed in combat")
-                    else
-                        DebugPrint("Failed to immediately collapse achievement tracker: " .. tostring(err))
-                    end
-                end
-                
-                if settings.collapseBonusObjectives and BonusObjectiveTracker then
-                    local ok, err = pcall(function()
-                        if BonusObjectiveTracker.SetCollapsed then
-                            BonusObjectiveTracker:SetCollapsed(true)
-                            collapsed = collapsed + 1
-                        end
-                    end)
-                    if ok then
-                        DebugPrint("Bonus objectives tracker immediately collapsed in combat")
-                    else
-                        DebugPrint("Failed to immediately collapse bonus objectives tracker: " .. tostring(err))
-                    end
-                end
-                
-                if settings.collapseCampaigns and CampaignQuestObjectiveTracker then
-                    local ok, err = pcall(function()
-                        if CampaignQuestObjectiveTracker.SetCollapsed then
-                            CampaignQuestObjectiveTracker:SetCollapsed(true)
-                            collapsed = collapsed + 1
-                        end
-                    end)
-                    if ok then
-                        DebugPrint("Campaign tracker immediately collapsed in combat")
-                    else
-                        DebugPrint("Failed to immediately collapse campaign tracker: " .. tostring(err))
-                    end
-                end
-                
-                if settings.collapseWorldQuests and WorldQuestObjectiveTracker then
-                    local ok, err = pcall(function()
-                        if WorldQuestObjectiveTracker.SetCollapsed then
-                            WorldQuestObjectiveTracker:SetCollapsed(true)
-                            collapsed = collapsed + 1
-                        end
-                    end)
-                    if ok then
-                        DebugPrint("World quest tracker immediately collapsed in combat")
-                    else
-                        DebugPrint("Failed to immediately collapse world quest tracker: " .. tostring(err))
                     end
                 end
                 
