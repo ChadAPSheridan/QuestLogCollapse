@@ -813,18 +813,11 @@ local function OnCombatStateChanged(event)
             -- Check if combat collapse is enabled
             local settings = ns.GetCurrentInstanceSettings and ns.GetCurrentInstanceSettings()
             if settings and settings.enabled then
-                DebugPrint("PLAYER_REGEN_DISABLED fired - checking if early combat already handled collapse")
-                
-                -- Check if early combat detection already handled the collapse
-                if combatStateQueue.enteredCombatOutsideInstance and not combatStateQueue.shouldCollapseOnCombatEnd then
-                    DebugPrint("Early combat detection already handled collapse - skipping duplicate attempt")
-                    return
-                end
-                
-                DebugPrint("Early combat did not fully handle collapse - attempting immediate collapse")
-                
-                -- Try to collapse immediately (before taint protection fully kicks in)
-                -- This is a backup in case PLAYER_ENTER_COMBAT didn't fire or failed
+                DebugPrint("PLAYER_REGEN_DISABLED fired - attempting immediate collapse")
+
+                -- Try to collapse immediately. SafeCollapseTracker can't run during
+                -- combat, so this direct path is the only one that can take effect
+                -- before InCombatLockdown blocks further frame manipulation.
                 local collapsed = 0
                 
                 -- Attempt immediate collapse of each enabled tracker
@@ -919,121 +912,6 @@ local function OnCombatStateChanged(event)
     end
 end
 
--- Early combat detection - this fires before PLAYER_REGEN_DISABLED
-local function OnEarlyCombat(event)
-    local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or QuestLogCollapseDB
-    if not profile or not profile.enabled then
-        DebugPrint("Addon disabled or no profile found")
-        return
-    end
-    
-    -- Make sure we're not in a dungeon to avoid conflicts
-    if not IsInDungeon() then
-        if event == "PLAYER_ENTER_COMBAT" then
-            -- Check if combat collapse is enabled
-            local settings = ns.GetCurrentInstanceSettings and ns.GetCurrentInstanceSettings()
-            if settings and settings.enabled then
-                DebugPrint("Early combat detection (PLAYER_ENTER_COMBAT) - attempting immediate collapse")
-                
-                -- Try to collapse immediately - this happens BEFORE taint protection
-                local collapsed = 0
-                
-                -- Attempt immediate collapse of each enabled tracker
-                if settings.collapseQuests and QuestObjectiveTracker then
-                    local ok, err = pcall(function()
-                        if QuestObjectiveTracker.SetCollapsed then
-                            QuestObjectiveTracker:SetCollapsed(true)
-                            collapsed = collapsed + 1
-                        end
-                    end)
-                    if ok then
-                        DebugPrint("Quest tracker collapsed via early combat detection")
-                    else
-                        DebugPrint("Failed early collapse of quest tracker: " .. tostring(err))
-                    end
-                end
-                
-                if settings.collapseAchievements and AchievementObjectiveTracker then
-                    local ok, err = pcall(function()
-                        if AchievementObjectiveTracker.SetCollapsed then
-                            AchievementObjectiveTracker:SetCollapsed(true)
-                            collapsed = collapsed + 1
-                        end
-                    end)
-                    if ok then
-                        DebugPrint("Achievement tracker collapsed via early combat detection")
-                    else
-                        DebugPrint("Failed early collapse of achievement tracker: " .. tostring(err))
-                    end
-                end
-                
-                if settings.collapseBonusObjectives and BonusObjectiveTracker then
-                    local ok, err = pcall(function()
-                        if BonusObjectiveTracker.SetCollapsed then
-                            BonusObjectiveTracker:SetCollapsed(true)
-                            collapsed = collapsed + 1
-                        end
-                    end)
-                    if ok then
-                        DebugPrint("Bonus objectives tracker collapsed via early combat detection")
-                    else
-                        DebugPrint("Failed early collapse of bonus objectives tracker: " .. tostring(err))
-                    end
-                end
-                
-                if settings.collapseCampaigns and CampaignQuestObjectiveTracker then
-                    local ok, err = pcall(function()
-                        if CampaignQuestObjectiveTracker.SetCollapsed then
-                            CampaignQuestObjectiveTracker:SetCollapsed(true)
-                            collapsed = collapsed + 1
-                        end
-                    end)
-                    if ok then
-                        DebugPrint("Campaign tracker collapsed via early combat detection")
-                    else
-                        DebugPrint("Failed early collapse of campaign tracker: " .. tostring(err))
-                    end
-                end
-                
-                if settings.collapseWorldQuests and WorldQuestObjectiveTracker then
-                    local ok, err = pcall(function()
-                        if WorldQuestObjectiveTracker.SetCollapsed then
-                            WorldQuestObjectiveTracker:SetCollapsed(true)
-                            collapsed = collapsed + 1
-                        end
-                    end)
-                    if ok then
-                        DebugPrint("World quest tracker collapsed via early combat detection")
-                    else
-                        DebugPrint("Failed early collapse of world quest tracker: " .. tostring(err))
-                    end
-                end
-                
-                if collapsed > 0 then
-                    DebugPrint("Successfully collapsed " .. collapsed .. " trackers via early combat detection")
-                    -- Mark that we successfully handled combat collapse early and need to expand on combat end
-                    combatStateQueue.enteredCombatOutsideInstance = true
-                    combatStateQueue.shouldCollapseOnCombatEnd = false
-                    combatStateQueue.shouldExpandOnCombatEnd = false
-                    combatStateQueue.trackersWereCollapsedInCombat = true
-                else
-                    DebugPrint("No trackers collapsed via early detection - will try again on PLAYER_REGEN_DISABLED")
-                    -- Still mark that we're in combat outside instance for potential later operations
-                    combatStateQueue.enteredCombatOutsideInstance = true
-                    combatStateQueue.trackersWereCollapsedInCombat = false
-                end
-            else
-                DebugPrint("Combat collapse not enabled for this profile")
-                -- Still mark that we entered combat outside instance for potential manual interaction
-                combatStateQueue.enteredCombatOutsideInstance = true
-                combatStateQueue.shouldCollapseOnCombatEnd = false
-                combatStateQueue.shouldExpandOnCombatEnd = false
-            end
-        end
-    else
-        DebugPrint("In dungeon/instance - skipping early combat detection")
-    end
-end
 -- Event handler
 QuestLogCollapse:SetScript("OnEvent", function(self, event, ...)
     if event == "ADDON_LOADED" then
@@ -1115,8 +993,8 @@ function SlashCmdList.QUESTLOGCOLLAPSE(msg)
         print("|cffff0000/qlc config|r - Open configuration panel")
         print("")
         print("|cff00ff00Combat Behavior:|r")
-        print("• Quest trackers collapse via early combat detection (PLAYER_ENTER_COMBAT)")
-        print("• Fallback attempt during PLAYER_REGEN_DISABLED if early detection fails")
+        print("• Quest trackers collapse on PLAYER_REGEN_DISABLED (combat start)")
+        print("• Trackers in the runtime taint blacklist are skipped")
         print("• Quest trackers automatically expand when combat ends (outside instances)")
         print("• If immediate collapse fails, operations are queued for when combat ends")
         print("• Use |cffff0000/qlc expand|r during combat to cancel queued operations")
