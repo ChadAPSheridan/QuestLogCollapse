@@ -103,6 +103,16 @@ local questTrackingState = {
 -- This flag approach allows the filter to run from hardware-initiated events without taint
 local needsZoneFilter = false
 
+-- "Have we installed the HookScript already?" guards. Kept as file-locals rather
+-- than as fields on the Blizzard frames themselves: writing a custom key onto a
+-- Blizzard frame from addon-tainted code marks the frame's table as tainted,
+-- which subsequently blocks every protected operation dispatched against it
+-- (e.g. ObjectiveTrackerFrame:Show / mixin'd methods on world-map open). See
+-- the commit that introduced these for the ADDON_ACTION_BLOCKED Frame:Show
+-- repro.
+local mapFrameHooked = false
+local minimizeButtonHooked = false
+
 -- Default settings
 local defaults = {
     enabled = true,
@@ -209,29 +219,18 @@ local function SafeCollapseTracker(tracker, name, shouldCollapse)
                     -- Add to taint blacklist for this session
                     TAINT_BLACKLIST[name] = true
                 else
-                    DebugPrint("Method 1 failed for " .. name .. ": " .. tostring(err))
-                    
-                    -- Method 2: Try using the collapsed property directly
-                    local ok2, err2 = pcall(function()
-                        if tracker then
-                            tracker.collapsed = true
-                            if tracker.Update then
-                                tracker:Update()
-                            end
-                        end
-                    end)
-                    
-                    if ok2 then
-                        DebugPrint(name .. " section collapsed using property method")
-                        success = true
-                    else
-                        DebugPrint("All methods failed for " .. name .. ": " .. tostring(err2))
-                    end
+                    -- Don't try a `tracker.collapsed = true` direct property write as a
+                    -- fallback — that taints the Blizzard tracker frame just as badly as
+                    -- the SetCollapsed API call (writing arbitrary keys onto a Blizzard
+                    -- frame from addon-tainted code marks the table as tainted, blocking
+                    -- every later protected operation on it). Leave the tracker in
+                    -- whatever state SetCollapsed left it.
+                    DebugPrint("SetCollapsed failed for " .. name .. ": " .. tostring(err) .. " (no fallback — direct property write would taint)")
                 end
             end
         end)
     end
-    
+
     return true
 end
 
@@ -394,29 +393,15 @@ local function SafeExpandTracker(tracker, name)
                     -- Add to taint blacklist for this session
                     TAINT_BLACKLIST[name] = true
                 else
-                    DebugPrint("Method 1 failed for " .. name .. ": " .. tostring(err))
-                    
-                    -- Method 2: Try using the collapsed property directly
-                    local ok2, err2 = pcall(function()
-                        if tracker then
-                            tracker.collapsed = false
-                            if tracker.Update then
-                                tracker:Update()
-                            end
-                        end
-                    end)
-                    
-                    if ok2 then
-                        DebugPrint(name .. " section expanded using property method")
-                        success = true
-                    else
-                        DebugPrint("All methods failed for " .. name .. ": " .. tostring(err2))
-                    end
+                    -- Don't try a `tracker.collapsed = false` direct property write as
+                    -- a fallback — same anti-pattern as SafeCollapseTracker's removed
+                    -- Method 2.
+                    DebugPrint("SetCollapsed(false) failed for " .. name .. ": " .. tostring(err) .. " (no fallback — direct property write would taint)")
                 end
             end
         end)
     end
-    
+
     return true
 end
 
@@ -1363,27 +1348,22 @@ end
 -- Hook World Map opening (hardware-initiated: key press or mouse click)
 -- The world map can be shown through multiple interfaces in modern WoW
 C_Timer.After(1, function()
-    -- WorldMapFrame might not exist immediately, retry until it does
     local function HookWorldMap()
-        if WorldMapFrame then
-            if not WorldMapFrame.qlcHooked then
-                WorldMapFrame:HookScript("OnShow", function()
-                    DebugPrint("World map opened - checking for pending zone filter")
-                    TryRunZoneFilter()
-                end)
-                WorldMapFrame.qlcHooked = true
-                DebugPrint("Hooked WorldMapFrame for zone filtering")
-            end
-            return true
-        end
-        return false
+        if mapFrameHooked then return true end
+        if not WorldMapFrame then return false end
+        WorldMapFrame:HookScript("OnShow", function()
+            DebugPrint("World map opened - checking for pending zone filter")
+            TryRunZoneFilter()
+        end)
+        mapFrameHooked = true
+        DebugPrint("Hooked WorldMapFrame for zone filtering")
+        return true
     end
-    
-    -- Try hooking immediately
+
     if not HookWorldMap() then
-        -- If WorldMapFrame doesn't exist yet, keep trying
         local attempts = 0
-        local ticker = C_Timer.NewTicker(1, function()
+        local ticker
+        ticker = C_Timer.NewTicker(1, function()
             attempts = attempts + 1
             if HookWorldMap() or attempts > 30 then
                 ticker:Cancel()
@@ -1392,32 +1372,36 @@ C_Timer.After(1, function()
     end
 end)
 
--- Hook Quest Log / Objective Tracker interaction
+-- Hook Quest Log / Objective Tracker interaction.
+-- Modern retail moved the minimize button from `ObjectiveTrackerFrame.HeaderMenu`
+-- to `ObjectiveTrackerFrame.Header`; we probe both rather than hard-code one.
+local function FindTrackerMinimizeButton()
+    local OT = ObjectiveTrackerFrame
+    if not OT then return nil end
+    if OT.Header     and OT.Header.MinimizeButton     then return OT.Header.MinimizeButton     end
+    if OT.HeaderMenu and OT.HeaderMenu.MinimizeButton then return OT.HeaderMenu.MinimizeButton end
+    if OT.MinimizeButton                              then return OT.MinimizeButton            end
+    return nil
+end
+
 C_Timer.After(1, function()
     local function HookQuestLog()
-        -- Modern WoW uses ObjectiveTrackerFrame
-        if ObjectiveTrackerFrame then
-            if not ObjectiveTrackerFrame.qlcHooked then
-                -- Hook the minimize/maximize button click which is hardware-initiated
-                if ObjectiveTrackerFrame.HeaderMenu and ObjectiveTrackerFrame.HeaderMenu.MinimizeButton then
-                    ObjectiveTrackerFrame.HeaderMenu.MinimizeButton:HookScript("OnMouseDown", function()
-                        DebugPrint("Quest tracker interacted with - checking for pending zone filter")
-                        TryRunZoneFilter()
-                    end)
-                end
-                ObjectiveTrackerFrame.qlcHooked = true
-                DebugPrint("Hooked ObjectiveTrackerFrame for zone filtering")
-            end
-            return true
-        end
-        return false
+        if minimizeButtonHooked then return true end
+        local btn = FindTrackerMinimizeButton()
+        if not btn then return false end
+        btn:HookScript("OnMouseDown", function()
+            DebugPrint("Quest tracker interacted with - checking for pending zone filter")
+            TryRunZoneFilter()
+        end)
+        minimizeButtonHooked = true
+        DebugPrint("Hooked tracker minimize button for zone filtering")
+        return true
     end
-    
-    -- Try hooking immediately
+
     if not HookQuestLog() then
-        -- If ObjectiveTrackerFrame doesn't exist yet, keep trying
         local attempts = 0
-        local ticker = C_Timer.NewTicker(1, function()
+        local ticker
+        ticker = C_Timer.NewTicker(1, function()
             attempts = attempts + 1
             if HookQuestLog() or attempts > 30 then
                 ticker:Cancel()
