@@ -38,7 +38,7 @@ local TAINT_BLACKLIST = {
     ["Adventure map"]      = true,  -- AdventureMapQuestObjectiveTracker: causes world map taint (collapseAdventureMaps defaults false; safety net for users who enable it)
     ["World quest"]        = true,  -- WorldQuestObjectiveTracker: causes map system taint (collapseWorldQuests defaults false; safety net for users who enable it)
     ["Bonus objectives"]   = true,  -- BonusObjectiveTracker: SetCollapsed taints UIWidget pool frame widths → LayoutFrame:491 "secret number" on Area POI tooltips
-    -- ["Quest"]            = true,  -- QuestObjectiveTracker: uncertain taint impact; collapseQuests defaults true for dungeons/raids so blacklisting would silently break the core feature — leave until a specific taint error is confirmed
+    ["Quest"]              = true,  -- QuestObjectiveTracker: SetCollapsed taints widget pool frame dimensions when the tracker holds quests with embedded reward / UIWidget content (delve coffer-key timers, world quest reward icons). Confirmed reproducer: tracked World Quest in the log → hover any World Quest pin on the world map → 38× "attempt to perform arithmetic on a secret number value" at Blizzard_GameTooltip/Mainline/GameTooltip.lua:754 (EmbeddedItemTooltip_UpdateSize). Also surfaces at LayoutFrame:491 / UIWidgetTemplateTextWithState:35 in Area POI tooltips.
 }
 
 -- Helper function to check if a value is tainted
