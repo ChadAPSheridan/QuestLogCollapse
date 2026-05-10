@@ -1,161 +1,104 @@
 -- QuestLogCollapse Configuration Panel
 -- Author: Gaspode
--- Version: 1.3.2
 
--- Use addon namespace to prevent global variable pollution and taint
 local addonName, ns = ...
 
-local QLC = QuestLogCollapseDB or {}
-
--- Default settings for profiles
+-- ============================================================
+-- DEFAULTS
+-- ============================================================
 local defaults = {
     enabled = true,
     debug = false,
     filterQuestsByZone = false,
-    -- Instance type settings
+    filterQuestsByZoneMode = "openworld",  -- "openworld" | "always"
     combat = {
         enabled = false,
-        collapseQuests = false,
-        collapseAchievements = false,
-        collapseBonusObjectives = false,
-        collapseScenarios = false,
-        collapseCampaigns = false,
-        collapseProfessions = false,
-        collapseMonthlyActivities = false,
-        collapseUIWidgets = false,
-        collapseAdventureMaps = false,
-        namePlates = { enabled = false }
+        collapseQuests = false, collapseAchievements = false,
+        collapseBonusObjectives = false, collapseScenarios = false, collapseCampaigns = false,
+        collapseProfessions = false, collapseMonthlyActivities = false,
+        collapseUIWidgets = false, collapseAdventureMaps = false, collapseWorldQuests = false,
+        namePlates = { enabled = false },
     },
     dungeons = {
         enabled = true,
-        collapseQuests = true,
-        collapseAchievements = false,
-        collapseBonusObjectives = true,
-        collapseScenarios = false,
-        collapseCampaigns = true,
-        collapseProfessions = false,
-        collapseMonthlyActivities = false,
-        collapseUIWidgets = false,
-        collapseAdventureMaps = false,
-        namePlates = { enabled = false }
+        collapseQuests = false, collapseAchievements = false,
+        collapseBonusObjectives = false, collapseScenarios = false, collapseCampaigns = true,
+        collapseProfessions = false, collapseMonthlyActivities = false,
+        collapseUIWidgets = false, collapseAdventureMaps = false, collapseWorldQuests = false,
+        namePlates = { enabled = false },
     },
     raids = {
         enabled = true,
-        collapseQuests = true,
-        collapseAchievements = false,
-        collapseBonusObjectives = true,
-        collapseScenarios = false,
-        collapseCampaigns = true,
-        collapseProfessions = false,
-        collapseMonthlyActivities = false,
-        collapseUIWidgets = false,
-        collapseAdventureMaps = false,
-        namePlates = { enabled = false }
+        collapseQuests = false, collapseAchievements = false,
+        collapseBonusObjectives = false, collapseScenarios = false, collapseCampaigns = true,
+        collapseProfessions = false, collapseMonthlyActivities = false,
+        collapseUIWidgets = false, collapseAdventureMaps = false, collapseWorldQuests = false,
+        namePlates = { enabled = false },
     },
     scenarios = {
         enabled = false,
-        collapseQuests = false,
-        collapseAchievements = false,
-        collapseBonusObjectives = false,
-        collapseScenarios = true,
-        collapseCampaigns = false,
-        collapseProfessions = false,
-        collapseMonthlyActivities = false,
-        collapseUIWidgets = false,
-        collapseAdventureMaps = false,
-        namePlates = { enabled = false }
+        collapseQuests = false, collapseAchievements = false,
+        collapseBonusObjectives = false, collapseScenarios = true, collapseCampaigns = false,
+        collapseProfessions = false, collapseMonthlyActivities = false,
+        collapseUIWidgets = false, collapseAdventureMaps = false, collapseWorldQuests = false,
+        namePlates = { enabled = false },
     },
     battlegrounds = {
         enabled = false,
-        collapseQuests = false,
-        collapseAchievements = false,
-        collapseBonusObjectives = false,
-        collapseScenarios = false,
-        collapseCampaigns = false,
-        collapseProfessions = false,
-        collapseMonthlyActivities = false,
-        collapseUIWidgets = false,
-        collapseAdventureMaps = false,
-        namePlates = { enabled = false }
+        collapseQuests = false, collapseAchievements = false,
+        collapseBonusObjectives = false, collapseScenarios = false, collapseCampaigns = false,
+        collapseProfessions = false, collapseMonthlyActivities = false,
+        collapseUIWidgets = false, collapseAdventureMaps = false, collapseWorldQuests = false,
+        namePlates = { enabled = false },
     },
     arenas = {
         enabled = false,
-        collapseQuests = false,
-        collapseAchievements = false,
-        collapseBonusObjectives = false,
-        collapseScenarios = false,
-        collapseCampaigns = false,
-        collapseProfessions = false,
-        collapseMonthlyActivities = false,
-        collapseUIWidgets = false,
-        collapseAdventureMaps = false,
-        namePlates = { enabled = false }
+        collapseQuests = false, collapseAchievements = false,
+        collapseBonusObjectives = false, collapseScenarios = false, collapseCampaigns = false,
+        collapseProfessions = false, collapseMonthlyActivities = false,
+        collapseUIWidgets = false, collapseAdventureMaps = false, collapseWorldQuests = false,
+        namePlates = { enabled = false },
     },
     garrisons = {
         enabled = false,
-        collapseQuests = false,
-        collapseAchievements = false,
-        collapseBonusObjectives = false,
-        collapseScenarios = false,
-        collapseCampaigns = false,
-        collapseProfessions = false,
-        collapseMonthlyActivities = false,
-        collapseUIWidgets = false,
-        collapseAdventureMaps = false,
-        namePlates = { enabled = false }
+        collapseQuests = false, collapseAchievements = false,
+        collapseBonusObjectives = false, collapseScenarios = false, collapseCampaigns = false,
+        collapseProfessions = false, collapseMonthlyActivities = false,
+        collapseUIWidgets = false, collapseAdventureMaps = false, collapseWorldQuests = false,
+        namePlates = { enabled = false },
     },
     classHalls = {
         enabled = false,
-        collapseQuests = false,
-        collapseAchievements = false,
-        collapseBonusObjectives = false,
-        collapseScenarios = false,
-        collapseCampaigns = false,
-        collapseProfessions = false,
-        collapseMonthlyActivities = false,
-        collapseUIWidgets = false,
-        collapseAdventureMaps = false,
-        namePlates = { enabled = false }
+        collapseQuests = false, collapseAchievements = false,
+        collapseBonusObjectives = false, collapseScenarios = false, collapseCampaigns = false,
+        collapseProfessions = false, collapseMonthlyActivities = false,
+        collapseUIWidgets = false, collapseAdventureMaps = false, collapseWorldQuests = false,
+        namePlates = { enabled = false },
     },
     questTables = {
         enabled = false,
-        collapseQuests = false,
-        collapseAchievements = false,
-        collapseBonusObjectives = false,
-        collapseScenarios = false,
-        collapseCampaigns = false,
-        collapseProfessions = false,
-        collapseMonthlyActivities = false,
-        collapseUIWidgets = false,
-        collapseAdventureMaps = false,
-        namePlates = { enabled = false }
+        collapseQuests = false, collapseAchievements = false,
+        collapseBonusObjectives = false, collapseScenarios = false, collapseCampaigns = false,
+        collapseProfessions = false, collapseMonthlyActivities = false,
+        collapseUIWidgets = false, collapseAdventureMaps = false, collapseWorldQuests = false,
+        namePlates = { enabled = false },
     },
     neighbourhood = {
         enabled = false,
-        collapseQuests = false,
-        collapseAchievements = false,
-        collapseBonusObjectives = false,
-        collapseScenarios = false,
-        collapseCampaigns = false,
-        collapseProfessions = false,
-        collapseMonthlyActivities = false,
-        collapseUIWidgets = false,
-        collapseAdventureMaps = false,
-        namePlates = { enabled = false }
+        collapseQuests = false, collapseAchievements = false,
+        collapseBonusObjectives = false, collapseScenarios = false, collapseCampaigns = false,
+        collapseProfessions = false, collapseMonthlyActivities = false,
+        collapseUIWidgets = false, collapseAdventureMaps = false, collapseWorldQuests = false,
+        namePlates = { enabled = false },
     },
     house = {
         enabled = false,
-        collapseQuests = false,
-        collapseAchievements = false,
-        collapseBonusObjectives = false,
-        collapseScenarios = false,
-        collapseCampaigns = false,
-        collapseProfessions = false,
-        collapseMonthlyActivities = false,
-        collapseUIWidgets = false,
-        collapseAdventureMaps = false,
-        namePlates = { enabled = false }
-    }
+        collapseQuests = false, collapseAchievements = false,
+        collapseBonusObjectives = false, collapseScenarios = false, collapseCampaigns = false,
+        collapseProfessions = false, collapseMonthlyActivities = false,
+        collapseUIWidgets = false, collapseAdventureMaps = false, collapseWorldQuests = false,
+        namePlates = { enabled = false },
+    },
 }
 
 local function getDefaultProfile()
@@ -164,7 +107,12 @@ local function getDefaultProfile()
         if type(v) == "table" then
             t[k] = {}
             for k2, v2 in pairs(v) do
-                t[k][k2] = v2
+                if type(v2) == "table" then
+                    t[k][k2] = {}
+                    for k3, v3 in pairs(v2) do t[k][k2][k3] = v3 end
+                else
+                    t[k][k2] = v2
+                end
             end
         else
             t[k] = v
@@ -178,23 +126,14 @@ local function InitializeConfigDB()
     if not QuestLogCollapseDB.profiles then
         QuestLogCollapseDB.profiles = { ["Default"] = getDefaultProfile() }
     end
-
-    -- Initialize character-specific database
-    if not QuestLogCollapseCharDB then
-        QuestLogCollapseCharDB = {}
-    end
-
-    -- Set default profile if none is set
+    if not QuestLogCollapseCharDB then QuestLogCollapseCharDB = {} end
     if not QuestLogCollapseCharDB.currentProfile then
         QuestLogCollapseCharDB.currentProfile = "Default"
     end
-
-    -- Ensure the current profile exists in the profiles database
     if not QuestLogCollapseDB.profiles[QuestLogCollapseCharDB.currentProfile] then
         QuestLogCollapseDB.profiles[QuestLogCollapseCharDB.currentProfile] = getDefaultProfile()
     end
-
-    -- Migrate old settings to new profile system
+    -- Migrate old flat settings into the profile system
     for k, v in pairs(defaults) do
         if QuestLogCollapseDB[k] ~= nil and (not QuestLogCollapseDB.profiles["Default"][k]) then
             QuestLogCollapseDB.profiles["Default"][k] = QuestLogCollapseDB[k]
@@ -204,28 +143,312 @@ local function InitializeConfigDB()
 end
 
 local function getProfile()
-    if not QuestLogCollapseDB or not QuestLogCollapseDB.profiles or not QuestLogCollapseCharDB or not QuestLogCollapseCharDB.currentProfile then
+    if not QuestLogCollapseDB or not QuestLogCollapseDB.profiles
+       or not QuestLogCollapseCharDB or not QuestLogCollapseCharDB.currentProfile then
         return getDefaultProfile()
     end
     return QuestLogCollapseDB.profiles[QuestLogCollapseCharDB.currentProfile] or getDefaultProfile()
 end
 
-local panel
+-- ============================================================
+-- SHARED UI HELPERS
+-- ============================================================
+local function Tip(widget, title, ...)
+    local lines = { ... }
+    widget:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText(title, 1, 0.82, 0)
+        for _, line in ipairs(lines) do
+            GameTooltip:AddLine(line, 1, 1, 1, true)
+        end
+        GameTooltip:Show()
+    end)
+    widget:SetScript("OnLeave", function() GameTooltip:Hide() end)
+end
 
-local function CreateQuestLogCollapseConfigPanel()
-    if panel then return panel end
+-- --------------------------------------------------------
+-- TRACKER SECTION DEFINITIONS  (used by all containers)
+-- --------------------------------------------------------
+-- blacklistName matches the friendly name used in the runtime TAINT_BLACKLIST table
+-- (see QuestLogCollapse.lua). When set and present in ns.TAINT_BLACKLIST at panel build,
+-- the corresponding checkbox is disabled and visually marked so the user understands
+-- the toggle is inert. Saved-vars values are left untouched.
+local SECTIONS_ROW1 = {
+    { key = "collapseQuests",
+      label = "Quests",
+      blacklistName = "Quest",
+      tip = "Collapse the Quest tracker (QuestObjectiveTracker).\nShows standard quests with objectives in your current area.\n|cffff9900Caution:|r Tracked quests with UIWidget content (e.g. delve coffer-key timers) taint Area POI tooltip widths. Off by default." },
+    { key = "collapseAchievements",
+      label = "Achievements",
+      tip = "Collapse the Achievement tracker.\nShows progress toward tracked achievement criteria." },
+    { key = "collapseBonusObjectives",
+      label = "Bonus",
+      blacklistName = "Bonus objectives",
+      tip = "Collapse the Bonus Objective tracker.\nShows area bonus objectives and rare encounters.\n|cffff9900Caution:|r Can cause taint on Area POI tooltips in some builds. Off by default." },
+    { key = "collapseCampaigns",
+      label = "Campaigns",
+      tip = "Collapse the Campaign Quest tracker.\nTracks story campaign and chapter quest chains." },
+    { key = "collapseScenarios",
+      label = "Scenario",
+      tip = "Collapse the Scenario/Dungeon objective tracker.\nShows dungeon and scenario step objectives." },
+}
+local SECTIONS_ROW2 = {
+    { key = "collapseWorldQuests",
+      label = "World Quests",
+      blacklistName = "World quest",
+      tip = "Collapse the World Quest tracker.\nShows world quests on the map.\n|cffff9900Caution:|r May cause world map system taint. Off by default." },
+    { key = "collapseProfessions",
+      label = "Professions",
+      tip = "Collapse the Profession Recipe tracker.\nShows active crafting work orders and profession recipes." },
+    { key = "collapseMonthlyActivities",
+      label = "Monthly",
+      blacklistName = "Monthly activities",
+      tip = "Collapse the Monthly Activities tracker.\nShows seasonal event and monthly quest progress bars.\n|cffff9900Caution:|r UIWidget status bars can cause taint. Off by default." },
+    { key = "collapseUIWidgets",
+      label = "Widgets",
+      blacklistName = "UI widgets",
+      tip = "Collapse the UI Widget objective tracker.\nShows general widget-based objectives.\n|cffff9900Caution:|r Directly manages widget pool frames — can cause taint. Off by default." },
+    { key = "collapseAdventureMaps",
+      label = "Adventure",
+      blacklistName = "Adventure map",
+      tip = "Collapse the Adventure Map Quest tracker.\nShows objectives from the adventure map.\n|cffff9900Caution:|r Can cause world map system taint. Off by default." },
+}
 
-    -- Define the new profile popup (do this once when panel is created)
+-- Returns true when the section's tracker is in the runtime TAINT_BLACKLIST.
+local function IsSectionBlacklisted(section)
+    return section.blacklistName and ns.TAINT_BLACKLIST and ns.TAINT_BLACKLIST[section.blacklistName] == true
+end
+
+local CONTAINER_H    = 107
+local CONTAINER_STEP = 112
+
+-- --------------------------------------------------------
+-- CONTAINER REFRESH HELPER
+-- --------------------------------------------------------
+local function RefreshContainer(container, instanceKey, prof)
+    if not container then return end
+    if not prof then prof = getProfile() end
+    if not prof[instanceKey] then
+        local src = defaults[instanceKey]
+        if src then
+            prof[instanceKey] = {}
+            for k, v in pairs(src) do
+                if type(v) == "table" then
+                    prof[instanceKey][k] = {}
+                    for k2, v2 in pairs(v) do prof[instanceKey][k][k2] = v2 end
+                else
+                    prof[instanceKey][k] = v
+                end
+            end
+        end
+    end
+    local s = prof[instanceKey]
+    if not s then return end
+    container.enabledCheck:SetChecked(s.enabled)
+    container.namePlatesEnabledCheck:SetChecked(s.namePlates and s.namePlates.enabled or false)
+    for _, section in ipairs(SECTIONS_ROW1) do
+        if container[section.key] then container[section.key]:SetChecked(s[section.key]) end
+    end
+    for _, section in ipairs(SECTIONS_ROW2) do
+        if container[section.key] then container[section.key]:SetChecked(s[section.key]) end
+    end
+end
+
+-- --------------------------------------------------------
+-- CONTAINER BUILDER
+-- --------------------------------------------------------
+local function BuildContainer(parent, instanceInfo, yTopLeft, isLegacy)
+    local container = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+    container:SetSize(622, CONTAINER_H)
+    container:SetPoint("TOPLEFT", parent, "TOPLEFT", -5, yTopLeft)
+    container:SetBackdrop({
+        bgFile   = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        edgeSize = 8,
+        insets   = { left = 2, right = 2, top = 2, bottom = 2 },
+    })
+    container:SetBackdropColor(0, 0, 0, isLegacy and 0.12 or 0.2)
+    container:SetBackdropBorderColor(0.4, 0.4, 0.4, isLegacy and 0.35 or 0.55)
+
+    -- Instance name label
+    local typeLabel = container:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    typeLabel:SetPoint("TOPLEFT", container, "TOPLEFT", 8, -8)
+    typeLabel:SetText(instanceInfo.color .. instanceInfo.name .. "|r")
+
+    -- "Active" (enabled) checkbox
+    local typeEnabledCheck = CreateFrame("CheckButton", nil, container, "InterfaceOptionsCheckButtonTemplate")
+    typeEnabledCheck:SetPoint("TOPLEFT", container, "TOPLEFT", 148, -4)
+    typeEnabledCheck.Text:SetText("Active")
+    typeEnabledCheck.key = instanceInfo.key
+    Tip(typeEnabledCheck, "Activate for " .. instanceInfo.name,
+        instanceInfo.contextTip or ("Apply these settings when you enter " .. instanceInfo.name .. "."),
+        "When unchecked, the addon will not collapse or expand any trackers in this context.")
+    typeEnabledCheck:SetScript("OnClick", function(self)
+        getProfile()[self.key].enabled = self:GetChecked()
+    end)
+
+    -- Build a single tracker checkbox row; gates blacklisted entries to inert + grayed.
+    local function BuildSectionRow(sections, yOffset)
+        for j, section in ipairs(sections) do
+            local cb = CreateFrame("CheckButton", nil, container, "InterfaceOptionsCheckButtonTemplate")
+            cb:SetPoint("TOPLEFT", container, "TOPLEFT", 5 + (j - 1) * 120, yOffset)
+            cb.instanceKey = instanceInfo.key
+            cb.sectionKey  = section.key
+            local blacklisted = IsSectionBlacklisted(section)
+            if blacklisted then
+                -- "(blacklisted)" suffix overflows the 120px column into adjacent
+                -- entries (see screenshot from 1.4.0-beta4). Use a small orange
+                -- asterisk instead and explain it in the tooltip.
+                cb.Text:SetText(section.label .. " |cffffaa00*|r")
+                cb:Disable()
+                cb:SetMotionScriptsWhileDisabled(true)  -- keep OnEnter/OnLeave firing for tooltip
+                cb.Text:SetTextColor(0.5, 0.5, 0.5)
+                Tip(cb, section.label .. " |cffffaa00*|r (blacklisted)",
+                    "|cffffaa00This tracker is in the runtime taint blacklist; the toggle has no effect.|r",
+                    "Reason: " .. (section.tip or ""),
+                    " ",
+                    "The |cffffaa00*|r in the label marks a blacklisted entry. The setting in your saved variables is left untouched, so removing the blacklist entry restores the toggle without losing your previous value.")
+            else
+                cb.Text:SetText(section.label)
+                Tip(cb, section.label, section.tip)
+                cb:SetScript("OnClick", function(self)
+                    getProfile()[self.instanceKey][self.sectionKey] = self:GetChecked()
+                end)
+            end
+            container[section.key] = cb
+        end
+    end
+
+    BuildSectionRow(SECTIONS_ROW1, -28)
+    BuildSectionRow(SECTIONS_ROW2, -50)
+
+    -- Thin separator before nameplate option
+    local npSep = container:CreateTexture(nil, "BACKGROUND")
+    npSep:SetPoint("TOPLEFT", container, "TOPLEFT", 5, -75)
+    npSep:SetSize(612, 1)
+    npSep:SetColorTexture(0.3, 0.3, 0.3, 0.4)
+
+    -- Nameplate toggle
+    local namePlatesCheck = CreateFrame("CheckButton", nil, container, "InterfaceOptionsCheckButtonTemplate")
+    namePlatesCheck:SetPoint("TOPLEFT", container, "TOPLEFT", 5, -79)
+    namePlatesCheck.Text:SetText("Show Enemy Name Plates")
+    namePlatesCheck.key = instanceInfo.key
+    Tip(namePlatesCheck, "Show Enemy Name Plates",
+        "Automatically enable enemy nameplates when entering " .. instanceInfo.name .. ".",
+        "Your original nameplate setting is restored when you leave.",
+        "Controls the |cffffcc00nameplateShowEnemies|r game CVar.")
+    namePlatesCheck:SetScript("OnClick", function(self)
+        local prof = getProfile()
+        if not prof[self.key].namePlates then prof[self.key].namePlates = {} end
+        prof[self.key].namePlates.enabled = self:GetChecked()
+    end)
+
+    container.enabledCheck          = typeEnabledCheck
+    container.namePlatesEnabledCheck = namePlatesCheck
+    return container
+end
+
+-- ============================================================
+-- INSTANCE TYPE DEFINITIONS
+-- ============================================================
+local combatType = {
+    { key = "combat", name = "Open World Combat", color = "|cffffff00",
+      contextTip = "Applied when you enter combat outside of any instance." },
+}
+local instanceTypes = {
+    { key = "dungeons",  name = "Dungeons",  color = "|cff00ff00",
+      contextTip = "Applied when you enter a 5-player dungeon (party instance)." },
+    { key = "raids",     name = "Raids",     color = "|cffff8000",
+      contextTip = "Applied when you enter a raid instance." },
+    { key = "scenarios", name = "Scenarios", color = "|cff0080ff",
+      contextTip = "Applied when you enter a scenario." },
+}
+local pvpTypes = {
+    { key = "battlegrounds", name = "Battlegrounds", color = "|cffff0080",
+      contextTip = "Applied when you enter a PvP battleground." },
+    { key = "arenas",        name = "Arenas",        color = "|cff8000ff",
+      contextTip = "Applied when you enter a PvP arena." },
+}
+local housingTypes = {
+    { key = "neighbourhood", name = "Neighbourhood", color = "|cff80ff80",
+      contextTip = "Applied in The War Within Neighbourhood areas." },
+    { key = "house",         name = "Player Housing", color = "|cffff80ff",
+      contextTip = "Applied inside your Player House." },
+}
+local legacyTypes = {
+    { key = "garrisons",   name = "Garrisons",   color = "|cffffc000",
+      contextTip = "Applied inside a Warlords of Draenor Garrison." },
+    { key = "classHalls",  name = "Class Halls", color = "|cffff00ff",
+      contextTip = "Applied inside a Legion Class Hall." },
+    { key = "questTables", name = "Quest Tables", color = "|cffff8080",
+      contextTip = "Applied when at a garrison mission table." },
+}
+
+-- ============================================================
+-- SUB-PANEL FACTORY  (Instance Settings / PvP / Housing / Legacy)
+-- ============================================================
+local function BuildContainerPanel(titleText, typeList, isLegacyStyle)
+    local subPanel = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
+    subPanel.OnCommit  = function() end
+    subPanel.OnDefault = function() end
+    subPanel.OnRefresh = function() end
+
+    local titleLabel = subPanel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    titleLabel:SetPoint("TOP", subPanel, "TOP", 0, -20)
+    titleLabel:SetText(titleText)
+
+    local scrollFrame = CreateFrame("ScrollFrame", nil, subPanel, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetPoint("TOPLEFT",     subPanel, "TOPLEFT",     0,   -50)
+    scrollFrame:SetPoint("BOTTOMRIGHT", subPanel, "BOTTOMRIGHT", -25,   8)
+
+    local scrollChild = CreateFrame("Frame", nil, scrollFrame)
+    scrollChild:SetSize(600, 100)
+    scrollFrame:SetScrollChild(scrollChild)
+
+    local containers = {}
+    local yOffset = -10
+    for _, instanceInfo in ipairs(typeList) do
+        containers[instanceInfo.key] = BuildContainer(scrollChild, instanceInfo, yOffset, isLegacyStyle)
+        yOffset = yOffset - CONTAINER_STEP
+    end
+    scrollChild:SetHeight(math.abs(yOffset) + 20)
+
+    subPanel.OnShow = function()
+        local prof = getProfile()
+        for _, instanceInfo in ipairs(typeList) do
+            RefreshContainer(containers[instanceInfo.key], instanceInfo.key, prof)
+        end
+    end
+    subPanel:HookScript("OnShow", subPanel.OnShow)
+    -- Also hand the same logic to OnRefresh, the documented Settings-system hook
+    -- (in case the canvas-layout dispatch ever skips the OnShow transition).
+    subPanel.OnRefresh = subPanel.OnShow
+
+    -- Hide after construction. CreateFrame returns a frame in shown state, so
+    -- the first Settings.OpenToCategory call would call frame:Show() as a no-op
+    -- and OnShow would never fire — leaving the checkboxes at their default
+    -- unticked state until a hide/show round-trip via category switching.
+    subPanel:Hide()
+
+    return subPanel
+end
+
+-- ============================================================
+-- BASIC OPTIONS PANEL  (parent category — global settings + open world combat)
+-- ============================================================
+local basicPanel  -- forward ref for SwitchProfile below
+
+local function CreateBasicOptionsPanel()
+    if basicPanel then return basicPanel end
+
+    -- refreshProfileDD is wired up once RefreshQLCProfileDropdown is defined below
+    local refreshProfileDD = nil
+
     if not StaticPopupDialogs["QUESTLOGCOLLAPSE_NEW_PROFILE"] then
-        -- Will use local RefreshQLCProfileDropdown via upvalue
-        local refreshFunc = nil  -- Will be set later
-        
         StaticPopupDialogs["QUESTLOGCOLLAPSE_NEW_PROFILE"] = {
             text = "Enter new profile name:",
-            button1 = "Create",
-            button2 = "Cancel",
-            hasEditBox = true,
-            maxLetters = 32,
+            button1 = "Create", button2 = "Cancel",
+            hasEditBox = true, maxLetters = 32,
             OnAccept = function(self)
                 local editBox = self.editBox or self.EditBox
                 local name = editBox and editBox:GetText():gsub("^%s+", ""):gsub("%s+$", "") or ""
@@ -236,192 +459,163 @@ local function CreateQuestLogCollapseConfigPanel()
                 end
                 QuestLogCollapseDB.profiles[name] = getDefaultProfile()
                 QuestLogCollapseCharDB.currentProfile = name
-                if refreshFunc then
-                    refreshFunc()
-                end
+                if refreshProfileDD then refreshProfileDD() end
                 print("|cff00ff00QuestLogCollapse|r Created profile: " .. name)
             end,
-            timeout = 0,
-            whileDead = true,
-            exclusive = true,
-            hideOnEscape = true,
-            preferredIndex = 3,
+            timeout = 0, whileDead = true, exclusive = true,
+            hideOnEscape = true, preferredIndex = 3,
         }
     end
 
-    panel = CreateFrame("Frame", "QuestLogCollapseConfigPanel", UIParent, "BackdropTemplate")
-    panel.name = "QuestLogCollapse"
+    basicPanel = CreateFrame("Frame", "QuestLogCollapseConfigPanel", UIParent, "BackdropTemplate")
+    basicPanel.name      = "QuestLogCollapse"
+    basicPanel.OnCommit  = function() end
+    basicPanel.OnDefault = function() end
+    basicPanel.OnRefresh = function() end
 
-    -- Title (stays fixed at top)
-    local title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", panel, "TOP", 0, -20)
-    title:SetText("QuestLogCollapse Configuration")
+    -- --------------------------------------------------------
+    -- TITLE
+    -- --------------------------------------------------------
+    local titleLabel = basicPanel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    titleLabel:SetPoint("TOP", basicPanel, "TOP", 0, -20)
+    titleLabel:SetText("QuestLogCollapse — Basic Options")
 
-    -- Create scroll frame
-    local scrollFrame = CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, -50)
-    scrollFrame:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -25, 0)
+    -- --------------------------------------------------------
+    -- DEBUG (pinned outside the scroll frame, always at bottom)
+    -- --------------------------------------------------------
+    local debugCheck = CreateFrame("CheckButton", nil, basicPanel, "InterfaceOptionsCheckButtonTemplate")
+    debugCheck:SetPoint("BOTTOMLEFT", basicPanel, "BOTTOMLEFT", 8, 8)
+    debugCheck.Text:SetText("Debug Mode")
+    Tip(debugCheck, "Debug Mode",
+        "Print verbose log messages to the chat frame.",
+        "Useful for diagnosing unexpected behaviour.",
+        "Toggle with |cffffcc00/qlc debug|r.")
 
-    -- Create scroll child (content frame)
+    -- --------------------------------------------------------
+    -- SCROLL FRAME
+    -- --------------------------------------------------------
+    local scrollFrame = CreateFrame("ScrollFrame", nil, basicPanel, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetPoint("TOPLEFT",     basicPanel, "TOPLEFT",     0,   -50)
+    scrollFrame:SetPoint("BOTTOMRIGHT", basicPanel, "BOTTOMRIGHT", -25,  32)  -- leave room for debug
+
     local scrollChild = CreateFrame("Frame", nil, scrollFrame)
-    scrollChild:SetSize(600, 1150) -- Adjusted height to fit all 11 instance containers + global settings + padding
+    scrollChild:SetSize(600, 320)
     scrollFrame:SetScrollChild(scrollChild)
 
-    -- Profile section
+    -- --------------------------------------------------------
+    -- PROFILE ROW
+    -- --------------------------------------------------------
     local profileLabel = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    profileLabel:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, -10)
+    profileLabel:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 5, -10)
     profileLabel:SetText("Profile:")
+    Tip(profileLabel, "Profiles",
+        "Profiles store independent sets of settings.",
+        "Switch profiles to quickly change between configurations (e.g. one for raiding, one for casual questing).")
 
     local profileDD = CreateFrame("Frame", nil, scrollChild, "UIDropDownMenuTemplate")
-    profileDD:SetPoint("LEFT", profileLabel, "RIGHT", 10, 0)
+    profileDD:SetPoint("LEFT", profileLabel, "RIGHT", 8, 0)
     UIDropDownMenu_SetWidth(profileDD, 150)
 
     local newProfileBtn = CreateFrame("Button", nil, scrollChild, "UIPanelButtonTemplate")
     newProfileBtn:SetSize(100, 22)
-    newProfileBtn:SetPoint("LEFT", profileDD, "RIGHT", 10, 0)
+    newProfileBtn:SetPoint("LEFT", profileDD, "RIGHT", 6, 0)
     newProfileBtn:SetText("New Profile")
-    newProfileBtn:SetScript("OnClick", function()
-        StaticPopup_Show("QUESTLOGCOLLAPSE_NEW_PROFILE")
-    end)
+    newProfileBtn:SetScript("OnClick", function() StaticPopup_Show("QUESTLOGCOLLAPSE_NEW_PROFILE") end)
+    Tip(newProfileBtn, "New Profile",
+        "Create a new profile with default settings.",
+        "The new profile becomes active immediately.")
 
-    local applyProfileBtn = CreateFrame("Button", nil, scrollChild, "UIPanelButtonTemplate")
-    applyProfileBtn:SetSize(100, 22)
-    applyProfileBtn:SetPoint("LEFT", newProfileBtn, "RIGHT", 10, 0)
-    applyProfileBtn:SetText("Apply")
-    applyProfileBtn:SetScript("OnClick", function()
-        if panel and panel.OnShow then
-            panel:OnShow()
-        end
-        -- Trigger OnZoneChanged to apply settings immediately
-        -- if OnZoneChanged then
-        --     C_Timer.After(0.1, OnZoneChanged)
-        -- end
-    end)
+    -- --------------------------------------------------------
+    -- SEPARATOR + GLOBAL ENABLE
+    -- --------------------------------------------------------
+    local sep1 = scrollChild:CreateTexture(nil, "BACKGROUND")
+    sep1:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 5, -38)
+    sep1:SetSize(590, 1)
+    sep1:SetColorTexture(0.5, 0.5, 0.5, 0.4)
 
-    -- Global settings
     local enabledCheck = CreateFrame("CheckButton", nil, scrollChild, "InterfaceOptionsCheckButtonTemplate")
-    enabledCheck:SetPoint("TOPLEFT", profileLabel, "BOTTOMLEFT", 0, -30)
+    enabledCheck:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, -46)
     enabledCheck.Text:SetText("Enable QuestLogCollapse")
+    Tip(enabledCheck, "Enable QuestLogCollapse",
+        "Master on/off switch for the entire addon.",
+        "When disabled, no trackers are collapsed or expanded and zone filtering does not run.",
+        "Toggle with |cffffcc00/qlc toggle|r.")
+
+    -- --------------------------------------------------------
+    -- ZONE FILTER SECTION
+    -- --------------------------------------------------------
+    local zfHeader = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    zfHeader:SetPoint("TOPLEFT", enabledCheck, "BOTTOMLEFT", 4, -8)
+    zfHeader:SetText("ZONE QUEST FILTERING")
+    zfHeader:SetTextColor(0.6, 0.6, 0.6)
 
     local filterQuestsByZoneCheck = CreateFrame("CheckButton", nil, scrollChild, "InterfaceOptionsCheckButtonTemplate")
-    filterQuestsByZoneCheck:SetPoint("LEFT", enabledCheck, "RIGHT", 200, 0)
-    filterQuestsByZoneCheck.Text:SetText("Filter Quests by Current Zone")
+    filterQuestsByZoneCheck:SetPoint("TOPLEFT", zfHeader, "BOTTOMLEFT", -4, -2)
+    filterQuestsByZoneCheck.Text:SetText("Filter tracked quests by current zone")
+    Tip(filterQuestsByZoneCheck, "Filter Tracked Quests by Zone",
+        "Adjusts which quests appear in your tracker based on your current zone.",
+        "Quests with objectives or map markers here are tracked; others are untracked.",
+        "Triggers automatically after a zone change when you start moving, mount/dismount, cast a spell, or interact with the quest tracker.",
+        "Use |cffffcc00/qlc filterzone|r to trigger manually.",
+        "|cffff9900Note:|r Your original tracked-quest list is saved and can be restored by disabling this option.")
 
-    local debugCheck = CreateFrame("CheckButton", nil, scrollChild, "InterfaceOptionsCheckButtonTemplate")
-    debugCheck:SetPoint("LEFT", filterQuestsByZoneCheck, "RIGHT", 200, 0)
-    debugCheck.Text:SetText("Debug Mode")
+    -- Mode dropdown (same row, to the right of the checkbox label)
+    local filterModeLabel = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    filterModeLabel:SetPoint("LEFT", filterQuestsByZoneCheck.Text, "RIGHT", 18, 0)
+    filterModeLabel:SetText("Apply in:")
+    filterModeLabel:SetTextColor(0.8, 0.8, 0.8)
 
-    -- type containers
-    local instanceTypes = {
-        { key = "combat",        name = "Combat",        color = "|cffffff00" },
-        { key = "dungeons",      name = "Dungeons",      color = "|cff00ff00" },
-        { key = "raids",         name = "Raids",         color = "|cffff8000" },
-        { key = "scenarios",     name = "Scenarios",     color = "|cff0080ff" },
-        { key = "battlegrounds", name = "Battlegrounds", color = "|cffff0080" },
-        { key = "arenas",        name = "Arenas",        color = "|cff8000ff" },
-        { key = "garrisons",     name = "Garrisons",     color = "|cffffc000" },
-        { key = "classHalls",    name = "Class Halls",   color = "|cffff00ff" },
-        { key = "questTables",   name = "Quest Tables",  color = "|cffff8080" },
-        { key = "neighbourhood", name = "Neighbourhood", color = "|cff80ff80" },
-        { key = "house",         name = "House",         color = "|cffff80ff" }
-    }
+    local filterModeDD = CreateFrame("Frame", nil, scrollChild, "UIDropDownMenuTemplate")
+    filterModeDD:SetPoint("LEFT", filterModeLabel, "RIGHT", 0, 0)
+    UIDropDownMenu_SetWidth(filterModeDD, 175)
+    Tip(filterModeDD, "Zone Filter Scope",
+        "|cff00ff00Open World Only|r — Filtering skips instances. Quests for your dungeon or raid stay visible naturally.",
+        "|cffff9900Always|r — Filtering runs everywhere, including while inside instances.",
+        "Default: Open World Only.")
 
-    local instanceContainers = {}
-    local yOffset = -110
-
-    for i, instanceInfo in ipairs(instanceTypes) do
-        local container = CreateFrame("Frame", nil, scrollChild, "BackdropTemplate")
-        container:SetSize(620, 85)
-        container:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", -5, yOffset)
-        container:SetBackdrop({
-            bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-            edgeSize = 8,
-            insets = { left = 2, right = 2, top = 2, bottom = 2 }
-        })
-        container:SetBackdropColor(0, 0, 0, 0.2)
-        container:SetBackdropBorderColor(0.4, 0.4, 0.4, 0.6)
-
-        instanceContainers[instanceInfo.key] = container
-
-        -- Instance type label and enable checkbox
-        local typeLabel = container:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-        typeLabel:SetPoint("TOPLEFT", container, "TOPLEFT", 5, -10)
-        typeLabel:SetText(instanceInfo.color .. instanceInfo.name .. "|r")
-
-        local typeEnabledCheck = CreateFrame("CheckButton", nil, container, "InterfaceOptionsCheckButtonTemplate")
-        typeEnabledCheck:SetPoint("TOPLEFT", container, "TOPLEFT", 125, -10)
-        typeEnabledCheck.Text:SetText("Enabled")
-        typeEnabledCheck.key = instanceInfo.key
-
-        local namePlatesEnabledCheck = CreateFrame("CheckButton", nil, container, "InterfaceOptionsCheckButtonTemplate")
-        namePlatesEnabledCheck:SetPoint("TOPLEFT", container, "TOPLEFT", 245, -10)
-        namePlatesEnabledCheck.Text:SetText("Show Enemy Name Plates")
-        namePlatesEnabledCheck.key = instanceInfo.key
-
-        -- Section checkboxes
-        local sections = {
-            { key = "collapseQuests",          name = "Quests" },
-            { key = "collapseAchievements",    name = "Achievements" },
-            { key = "collapseBonusObjectives", name = "Bonus" },
-            { key = "collapseCampaigns",       name = "Campaigns" },
-            { key = "collapseScenarios",       name = "Scenario/Dungeon" }
-        }
-
-        local sections2 = {
-            { key = "collapseWorldQuests",       name = "World" },
-            { key = "collapseProfessions",       name = "Professions" },
-            { key = "collapseMonthlyActivities", name = "Monthly" },
-            { key = "collapseUIWidgets",         name = "Widgets" },
-            { key = "collapseAdventureMaps",     name = "Adventure" }
-        }
-
-        -- First row of checkboxes
-        for j, section in ipairs(sections) do
-            local sectionCheck = CreateFrame("CheckButton", nil, container, "InterfaceOptionsCheckButtonTemplate")
-            sectionCheck:SetPoint("TOPLEFT", container, "TOPLEFT", 5 + (j - 1) * 120, -35)
-            sectionCheck.Text:SetText(section.name)
-            sectionCheck.instanceKey = instanceInfo.key
-            sectionCheck.sectionKey = section.key
-            sectionCheck:SetScript("OnClick", function(self)
-                local prof = getProfile()
-                prof[self.instanceKey][self.sectionKey] = self:GetChecked()
-            end)
-            container[section.key] = sectionCheck
-        end
-
-        -- Second row of checkboxes
-        for j, section in ipairs(sections2) do
-            local sectionCheck = CreateFrame("CheckButton", nil, container, "InterfaceOptionsCheckButtonTemplate")
-            sectionCheck:SetPoint("TOPLEFT", container, "TOPLEFT", 5 + (j - 1) * 120, -55)
-            sectionCheck.Text:SetText(section.name)
-            sectionCheck.instanceKey = instanceInfo.key
-            sectionCheck.sectionKey = section.key
-            sectionCheck:SetScript("OnClick", function(self)
-                local prof = getProfile()
-                prof[self.instanceKey][self.sectionKey] = self:GetChecked()
-            end)
-            container[section.key] = sectionCheck
-        end
-
-        container.enabledCheck = typeEnabledCheck
-        container.namePlatesEnabledCheck = namePlatesEnabledCheck
-
-        typeEnabledCheck:SetScript("OnClick", function(self)
-            local prof = getProfile()
-            prof[self.key].enabled = self:GetChecked()
+    local function InitFilterModeDD()
+        UIDropDownMenu_Initialize(filterModeDD, function()
+            local modes = {
+                { value = "openworld", text = "Open World Only" },
+                { value = "always",    text = "Always (incl. instances)" },
+            }
+            local currentMode = getProfile().filterQuestsByZoneMode or "openworld"
+            for _, mode in ipairs(modes) do
+                local info = UIDropDownMenu_CreateInfo()
+                info.text    = mode.text
+                info.value   = mode.value
+                info.checked = (currentMode == mode.value)
+                info.func    = function(item)
+                    getProfile().filterQuestsByZoneMode = item.value
+                    UIDropDownMenu_SetSelectedValue(filterModeDD, item.value)
+                end
+                UIDropDownMenu_AddButton(info)
+            end
         end)
-
-        namePlatesEnabledCheck:SetScript("OnClick", function(self)
-            local prof = getProfile()
-            if not prof[self.key].namePlates then prof[self.key].namePlates = {} end
-            prof[self.key].namePlates.enabled = self:GetChecked()
-        end)
-
-        yOffset = yOffset - 90
+        UIDropDownMenu_SetSelectedValue(filterModeDD, getProfile().filterQuestsByZoneMode or "openworld")
     end
+    InitFilterModeDD()
 
-    -- Profile dropdown refresh function (local, not global)
+    -- --------------------------------------------------------
+    -- OPEN WORLD COMBAT SECTION
+    -- --------------------------------------------------------
+    local sep2 = scrollChild:CreateTexture(nil, "BACKGROUND")
+    sep2:SetPoint("TOPLEFT", filterQuestsByZoneCheck, "BOTTOMLEFT", 4, -10)
+    sep2:SetSize(590, 1)
+    sep2:SetColorTexture(0.5, 0.5, 0.5, 0.4)
+
+    local owcHeader = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    owcHeader:SetPoint("TOPLEFT", sep2, "BOTTOMLEFT", 0, -8)
+    owcHeader:SetText("OPEN WORLD COMBAT")
+    owcHeader:SetTextColor(0.6, 0.6, 0.6)
+
+    -- yTopLeft computed from: profile(~26) + sep1(1) + enable(26) + zfHeader(14) + filter(26) + sep2(1) + gap(8) + owcHeader(14) + gap(6) ≈ 163
+    local combatContainer = BuildContainer(scrollChild, combatType[1], -163, false)
+    scrollChild:SetHeight(163 + CONTAINER_H + 20)
+
+    -- --------------------------------------------------------
+    -- PROFILE DROPDOWN
+    -- --------------------------------------------------------
     local function RefreshQLCProfileDropdown()
         if not QuestLogCollapseDB or not QuestLogCollapseDB.profiles or not QuestLogCollapseCharDB then
             return
@@ -430,148 +624,110 @@ local function CreateQuestLogCollapseConfigPanel()
         for k in pairs(QuestLogCollapseDB.profiles) do table.insert(items, k) end
         table.sort(items)
 
-        UIDropDownMenu_Initialize(profileDD, function(self, level)
+        UIDropDownMenu_Initialize(profileDD, function()
             for _, name in ipairs(items) do
                 local info = UIDropDownMenu_CreateInfo()
-                info.text = name
+                info.text    = name
                 info.checked = (name == QuestLogCollapseCharDB.currentProfile)
-                info.func = function()
+                info.func    = function()
                     QuestLogCollapseCharDB.currentProfile = name
-                    if panel.OnShow then panel:OnShow() end
+                    if basicPanel.OnShow then basicPanel:OnShow() end
                 end
                 UIDropDownMenu_AddButton(info)
             end
         end)
         UIDropDownMenu_SetSelectedValue(profileDD, QuestLogCollapseCharDB.currentProfile)
     end
-    
-    -- Set the refresh function for the popup dialog to use
-    if StaticPopupDialogs["QUESTLOGCOLLAPSE_NEW_PROFILE"] then
-        -- Access the OnAccept function's upvalue
-        local popup = StaticPopupDialogs["QUESTLOGCOLLAPSE_NEW_PROFILE"]
-        local oldAccept = popup.OnAccept
-        popup.OnAccept = function(self)
-            local editBox = self.editBox or self.EditBox
-            local name = editBox and editBox:GetText():gsub("^%s+", ""):gsub("%s+$", "") or ""
-            if name == "" then return end
-            if QuestLogCollapseDB.profiles[name] then
-                print("|cffff0000QuestLogCollapse|r Profile already exists.")
-                return
-            end
-            QuestLogCollapseDB.profiles[name] = getDefaultProfile()
-            QuestLogCollapseCharDB.currentProfile = name
-            RefreshQLCProfileDropdown()  -- Use local function
-            print("|cff00ff00QuestLogCollapse|r Created profile: " .. name)
-        end
-    end
 
-    -- Update panel on show
-    panel.OnShow = function()
+    refreshProfileDD = RefreshQLCProfileDropdown  -- wire up the StaticPopup upvalue
+
+    -- --------------------------------------------------------
+    -- PANEL OnShow — refresh all widgets from current profile
+    -- --------------------------------------------------------
+    basicPanel.OnShow = function()
         local prof = getProfile()
 
-        -- Update global settings
         enabledCheck:SetChecked(prof.enabled)
         debugCheck:SetChecked(prof.debug)
         filterQuestsByZoneCheck:SetChecked(prof.filterQuestsByZone or false)
+        UIDropDownMenu_SetSelectedValue(filterModeDD, prof.filterQuestsByZoneMode or "openworld")
 
-        -- Update instance type settings
-        for _, instanceInfo in ipairs(instanceTypes) do
-            local container = instanceContainers[instanceInfo.key]
-
-            -- Initialize missing instance settings from defaults
-            if not prof[instanceInfo.key] then
-                local defaultSettings = defaults[instanceInfo.key]
-                if defaultSettings and type(defaultSettings) == "table" then
-                    prof[instanceInfo.key] = {}
-                    for k, v in pairs(defaultSettings) do
-                        if type(v) == "table" then
-                            prof[instanceInfo.key][k] = {}
-                            for k2, v2 in pairs(v) do
-                                prof[instanceInfo.key][k][k2] = v2
-                            end
-                        else
-                            prof[instanceInfo.key][k] = v
-                        end
-                    end
-                end
-            end
-
-            local instanceSettings = prof[instanceInfo.key]
-            if instanceSettings then
-                container.enabledCheck:SetChecked(instanceSettings.enabled)
-
-                -- Update nameplate settings
-                if container.namePlatesEnabledCheck then
-                    local namePlateEnabled = instanceSettings.namePlates and instanceSettings.namePlates.enabled or false
-                    container.namePlatesEnabledCheck:SetChecked(namePlateEnabled)
-                end
-
-                -- Update section checkboxes
-                local allSections = {
-                    "collapseQuests", "collapseAchievements", "collapseBonusObjectives",
-                    "collapseScenarios", "collapseCampaigns", "collapseProfessions",
-                    "collapseMonthlyActivities", "collapseUIWidgets", "collapseAdventureMaps"
-                }
-
-                for _, sectionKey in ipairs(allSections) do
-                    if container[sectionKey] then
-                        container[sectionKey]:SetChecked(instanceSettings[sectionKey])
-                    end
-                end
-            end
-        end
-
+        RefreshContainer(combatContainer, "combat", prof)
         RefreshQLCProfileDropdown()
+        InitFilterModeDD()
     end
 
-    panel:HookScript("OnShow", panel.OnShow)
+    basicPanel:HookScript("OnShow", basicPanel.OnShow)
+    basicPanel.OnRefresh = basicPanel.OnShow
 
-    -- Global setting handlers
+    -- See BuildContainerPanel — same reason: hide so the first Settings.Show()
+    -- actually transitions visibility and fires OnShow.
+    basicPanel:Hide()
+
+    -- --------------------------------------------------------
+    -- GLOBAL CHECKBOX HANDLERS
+    -- --------------------------------------------------------
     enabledCheck:SetScript("OnClick", function(self)
-        local prof = getProfile()
-        prof.enabled = self:GetChecked()
-    end)
-
-    debugCheck:SetScript("OnClick", function(self)
-        local prof = getProfile()
-        prof.debug = self:GetChecked()
+        getProfile().enabled = self:GetChecked()
     end)
 
     filterQuestsByZoneCheck:SetScript("OnClick", function(self)
-        local prof = getProfile()
-        prof.filterQuestsByZone = self:GetChecked()
+        getProfile().filterQuestsByZone = self:GetChecked()
     end)
 
-    return panel
+    debugCheck:SetScript("OnClick", function(self)
+        getProfile().debug = self:GetChecked()
+    end)
+
+    return basicPanel
 end
 
--- Event frame for initialization and panel registration
+-- ============================================================
+-- EVENTS + REGISTRATION
+-- ============================================================
 local configEventFrame = CreateFrame("Frame")
 configEventFrame:RegisterEvent("ADDON_LOADED")
 configEventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 
 local panelRegistered = false
+local allPanels       = {}
 
--- Cleanup on profile switch
 local function SwitchProfile(profileName)
     QuestLogCollapseCharDB.currentProfile = profileName
-    -- Clear any unused references
-    if panel and panel.OnShow then
-        panel:OnShow()
+    for _, p in ipairs(allPanels) do
+        if p.OnShow then p:OnShow() end
     end
 end
 
-configEventFrame:SetScript("OnEvent", function(self, event, addonName)
-    if event == "ADDON_LOADED" and addonName == "QuestLogCollapse" then
+configEventFrame:SetScript("OnEvent", function(self, event, arg1)
+    if event == "ADDON_LOADED" and arg1 == "QuestLogCollapse" then
         InitializeConfigDB()
     elseif event == "PLAYER_ENTERING_WORLD" then
         if not panelRegistered then
-            -- Register the panel in the options menu
-            local configPanel = CreateQuestLogCollapseConfigPanel()
+            -- Create all panels
+            local basicOpts    = CreateBasicOptionsPanel()
+            local instPanel    = BuildContainerPanel("Instances", instanceTypes, false)
+            local pvpPanel     = BuildContainerPanel("PvP",      pvpTypes,     false)
+            local housingPanel = BuildContainerPanel("Housing",   housingTypes, false)
+            local legacyPanel  = BuildContainerPanel("Legacy",    legacyTypes,  true)
 
-            local category = Settings.RegisterCanvasLayoutCategory(configPanel, "QuestLogCollapse")
-            Settings.RegisterAddOnCategory(category)
-            configPanel.categoryID = category.ID
+            allPanels = { basicOpts, instPanel, pvpPanel, housingPanel, legacyPanel }
+
+            -- Register parent category (Basic Options)
+            local parentCat = Settings.RegisterCanvasLayoutCategory(basicOpts, "QuestLogCollapse")
+            Settings.RegisterAddOnCategory(parentCat)
+            basicOpts.categoryID = parentCat.ID
+
+            -- Register the four subcategories
+            local function RegSub(subPanel, name)
+                local subCat = Settings.RegisterCanvasLayoutSubcategory(parentCat, subPanel, name)
+                Settings.RegisterAddOnCategory(subCat)
+                subPanel.categoryID = subCat.ID
+            end
+            RegSub(instPanel,    "Instances")
+            RegSub(pvpPanel,     "PvP")
+            RegSub(housingPanel, "Housing")
+            RegSub(legacyPanel,  "Legacy")
 
             panelRegistered = true
         end
@@ -579,64 +735,42 @@ configEventFrame:SetScript("OnEvent", function(self, event, addonName)
     end
 end)
 
--- Local function to get current instance settings (used by main addon via namespace)
+-- ============================================================
+-- NAMESPACE EXPORTS
+-- ============================================================
 local function GetCurrentInstanceSettings()
     local prof = getProfile()
     if not prof then return nil end
 
     local instanceType = select(2, IsInInstance())
-    if ns.DebugPrint then 
+    if ns.DebugPrint then
         ns.DebugPrint("Current instance type: " .. tostring(instanceType))
     end
     if instanceType == "party" then
-        local isInGarrison = C_Garrison.IsPlayerInGarrison(Enum.GarrisonType.Type_6_0_Garrison)
+        local isInGarrison  = C_Garrison.IsPlayerInGarrison(Enum.GarrisonType.Type_6_0_Garrison)
         local isInClassHall = C_Garrison.IsPlayerInGarrison(Enum.GarrisonType.Type_7_0_Garrison)
         local isAtQuestTable = C_Garrison.IsAtGarrisonMissionNPC() or
-            C_Garrison.IsPlayerInGarrison(Enum.GarrisonType.Type_8_0_Garrison)
-        if isInGarrison then
-            if ns.DebugPrint then
-                ns.DebugPrint("Player is in a garrison")
-            end
-            return prof.garrisons
-        elseif isInClassHall then
-            if ns.DebugPrint then
-                ns.DebugPrint("Player is in a class hall")
-            end
-            return prof.classHalls
-        elseif isAtQuestTable then
-            if ns.DebugPrint then
-                ns.DebugPrint("Player is at a quest table")
-            end
-            return prof.questTables
-        else
-            return prof.dungeons
+                               C_Garrison.IsPlayerInGarrison(Enum.GarrisonType.Type_8_0_Garrison)
+        if isInGarrison      then return prof.garrisons
+        elseif isInClassHall then return prof.classHalls
+        elseif isAtQuestTable then return prof.questTables
+        else                      return prof.dungeons
         end
-    elseif instanceType == "raid" then
-        return prof.raids
-    elseif instanceType == "scenario" then
-        return prof.scenarios
-    elseif instanceType == "pvp" then
-        return prof.battlegrounds
-    elseif instanceType == "arena" then
-        return prof.arenas
-    elseif instanceType == "neighborhood" then
-        return prof.neighbourhood
-    elseif instanceType == "interior" then
-        return prof.house
-    else
-        return prof.combat
+    elseif instanceType == "raid"         then return prof.raids
+    elseif instanceType == "scenario"     then return prof.scenarios
+    elseif instanceType == "pvp"          then return prof.battlegrounds
+    elseif instanceType == "arena"        then return prof.arenas
+    elseif instanceType == "neighborhood" then return prof.neighbourhood
+    elseif instanceType == "interior"     then return prof.house
+    else                                       return prof.combat
     end
-
-    return nil
 end
 
--- Local function to get current profile (used by main addon via namespace)
 local function GetCurrentQLCProfile()
     return getProfile()
 end
 
--- Export functions to namespace for use by main addon file
-ns.CreateQuestLogCollapseConfigPanel = CreateQuestLogCollapseConfigPanel
-ns.GetCurrentInstanceSettings = GetCurrentInstanceSettings
-ns.GetCurrentQLCProfile = GetCurrentQLCProfile
-ns.SwitchProfile = SwitchProfile
+ns.CreateQuestLogCollapseConfigPanel = CreateBasicOptionsPanel
+ns.GetCurrentInstanceSettings        = GetCurrentInstanceSettings
+ns.GetCurrentQLCProfile              = GetCurrentQLCProfile
+ns.SwitchProfile                     = SwitchProfile

@@ -108,6 +108,7 @@ local defaults = {
     enabled = true,
     debug = false,
     filterQuestsByZone = false,
+    filterQuestsByZoneMode = "openworld",  -- "openworld" skips filtering inside instances
     collapseQuests = false,  -- Disabled by default - causes taint
     collapseAchievements = true,
     collapseBonusObjectives = false,  -- Disabled by default - causes area POI taint
@@ -133,6 +134,8 @@ local function DebugPrint(message)
 end
 -- Make DebugPrint available to other addon files via namespace
 ns.DebugPrint = DebugPrint
+-- Expose taint blacklist so the config UI can gate toggles for trackers we refuse to collapse
+ns.TAINT_BLACKLIST = TAINT_BLACKLIST
 
 local function IsInDungeon()
     local instanceType = select(2, IsInInstance())
@@ -542,7 +545,15 @@ local function FilterQuestsByZone()
         needsZoneFilter = false  -- Clear the flag
         return
     end
-    
+
+    -- Respect the zone filter mode: skip when inside any instance if set to open-world only
+    local filterMode = profile.filterQuestsByZoneMode or "openworld"
+    if filterMode == "openworld" and IsInInstance() then
+        DebugPrint("FilterQuestsByZone() skipped - in instance (mode: Open World Only)")
+        needsZoneFilter = false
+        return
+    end
+
     -- Clear the flag since we're running now
     needsZoneFilter = false
     
@@ -590,11 +601,22 @@ local function FilterQuestsByZone()
         -- Step 1: Untrack quests not in current zone
         local untracked = 0
         local kept = 0
-        
+
         -- Get the number of tracked quests
         local numTracked = C_QuestLog.GetNumQuestWatches()
         DebugPrint("=== STEP 1: Checking " .. numTracked .. " currently tracked quests ===")
-        
+
+        -- Snapshot the watch list before modifying it so we can restore it later
+        if not questTrackingState.addonModifiedTracking then
+            questTrackingState.originalTrackedQuests = {}
+            for i = 1, numTracked do
+                local qid = C_QuestLog.GetQuestIDForQuestWatchIndex(i)
+                if qid then questTrackingState.originalTrackedQuests[qid] = true end
+            end
+            questTrackingState.addonModifiedTracking = true
+            DebugPrint("Saved original quest tracking state (" .. numTracked .. " quests)")
+        end
+
         -- Iterate through tracked quests (iterate backwards to avoid index issues when removing)
         for i = numTracked, 1, -1 do
             local questID = C_QuestLog.GetQuestIDForQuestWatchIndex(i)
