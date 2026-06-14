@@ -1,6 +1,6 @@
 -- QuestLogCollapse Configuration Panel
 -- Author: Gaspode
--- Version: 1.3.2.1
+-- Version: 1.3.2
 
 -- Use addon namespace to prevent global variable pollution and taint
 local addonName, ns = ...
@@ -219,7 +219,7 @@ local function CreateQuestLogCollapseConfigPanel()
     if not StaticPopupDialogs["QUESTLOGCOLLAPSE_NEW_PROFILE"] then
         -- Will use local RefreshQLCProfileDropdown via upvalue
         local refreshFunc = nil  -- Will be set later
-
+        
         StaticPopupDialogs["QUESTLOGCOLLAPSE_NEW_PROFILE"] = {
             text = "Enter new profile name:",
             button1 = "Create",
@@ -444,7 +444,7 @@ local function CreateQuestLogCollapseConfigPanel()
         end)
         UIDropDownMenu_SetSelectedValue(profileDD, QuestLogCollapseCharDB.currentProfile)
     end
-
+    
     -- Set the refresh function for the popup dialog to use
     if StaticPopupDialogs["QUESTLOGCOLLAPSE_NEW_PROFILE"] then
         -- Access the OnAccept function's upvalue
@@ -585,7 +585,7 @@ local function GetCurrentInstanceSettings()
     if not prof then return nil end
 
     local instanceType = select(2, IsInInstance())
-    if ns.DebugPrint then
+    if ns.DebugPrint then 
         ns.DebugPrint("Current instance type: " .. tostring(instanceType))
     end
     if instanceType == "party" then
