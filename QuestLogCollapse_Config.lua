@@ -15,6 +15,7 @@ local defaults = {
     debug = false,
     filterQuestsByZone = false,
     filterQuestsByZoneMode = "openworld",  -- "openworld" | "always"
+    questInteractionCollapseBehavior = "skip_section", -- "off" | "skip_section" | "untrack_others"
     combat = {
         enabled = false,
         collapseQuests = false, collapseAchievements = false,
@@ -600,11 +601,50 @@ local function CreateBasicOptionsPanel()
     end
     InitFilterModeDD()
 
+    -- Quest tracker interaction-button handling mode
+    local interactionModeLabel = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    interactionModeLabel:SetPoint("TOPLEFT", filterQuestsByZoneCheck, "BOTTOMLEFT", 17, -10)
+    interactionModeLabel:SetText("Quest collapse with tracked interaction-button quests:")
+    interactionModeLabel:SetTextColor(0.8, 0.8, 0.8)
+
+    local interactionModeDD = CreateFrame("Frame", nil, scrollChild, "UIDropDownMenuTemplate")
+    interactionModeDD:SetPoint("TOPLEFT", interactionModeLabel, "BOTTOMLEFT", -15, -2)
+    UIDropDownMenu_SetWidth(interactionModeDD, 285)
+    Tip(interactionModeDD, "Quest Collapse Interaction Handling",
+        "When a watched quest has an interaction button (quest item), choose how quest-section collapse behaves:",
+        "|cff00ff00Skip Quest section|r — leave the Quest tracker expanded for this collapse pass.",
+        "|cffff9900Untrack other watched quests|r — keep only interaction-button quests watched, then collapse Quest.",
+        "|cffff6666Disabled|r — do not apply special handling.")
+
+    local function InitInteractionModeDD()
+        UIDropDownMenu_Initialize(interactionModeDD, function()
+            local modes = {
+                { value = "skip_section",   text = "Skip Quest section (default)" },
+                { value = "untrack_others", text = "Untrack other watched quests, then collapse Quest" },
+                { value = "off",            text = "Disabled" },
+            }
+            local currentMode = getProfile().questInteractionCollapseBehavior or "skip_section"
+            for _, mode in ipairs(modes) do
+                local info = UIDropDownMenu_CreateInfo()
+                info.text    = mode.text
+                info.value   = mode.value
+                info.checked = (currentMode == mode.value)
+                info.func    = function(item)
+                    getProfile().questInteractionCollapseBehavior = item.value
+                    UIDropDownMenu_SetSelectedValue(interactionModeDD, item.value)
+                end
+                UIDropDownMenu_AddButton(info)
+            end
+        end)
+        UIDropDownMenu_SetSelectedValue(interactionModeDD, getProfile().questInteractionCollapseBehavior or "skip_section")
+    end
+    InitInteractionModeDD()
+
     -- --------------------------------------------------------
     -- OPEN WORLD COMBAT SECTION
     -- --------------------------------------------------------
     local sep2 = scrollChild:CreateTexture(nil, "BACKGROUND")
-    sep2:SetPoint("TOPLEFT", filterQuestsByZoneCheck, "BOTTOMLEFT", 4, -10)
+    sep2:SetPoint("TOPLEFT", interactionModeDD, "BOTTOMLEFT", 4, -6)
     sep2:SetSize(590, 1)
     sep2:SetColorTexture(0.5, 0.5, 0.5, 0.4)
 
@@ -613,9 +653,9 @@ local function CreateBasicOptionsPanel()
     owcHeader:SetText("OPEN WORLD COMBAT")
     owcHeader:SetTextColor(0.6, 0.6, 0.6)
 
-    -- yTopLeft computed from: profile(~26) + sep1(1) + enable(26) + zfHeader(14) + filter(26) + sep2(1) + gap(8) + owcHeader(14) + gap(6) ≈ 163
-    local combatContainer = BuildContainer(scrollChild, combatType[1], -163, false)
-    scrollChild:SetHeight(163 + CONTAINER_H + 20)
+    -- yTopLeft computed from the sections above, including interaction handling controls.
+    local combatContainer = BuildContainer(scrollChild, combatType[1], -220, false)
+    scrollChild:SetHeight(220 + CONTAINER_H + 20)
 
     -- --------------------------------------------------------
     -- PROFILE DROPDOWN
@@ -655,10 +695,12 @@ local function CreateBasicOptionsPanel()
         debugCheck:SetChecked(prof.debug)
         filterQuestsByZoneCheck:SetChecked(prof.filterQuestsByZone or false)
         UIDropDownMenu_SetSelectedValue(filterModeDD, prof.filterQuestsByZoneMode or "openworld")
+        UIDropDownMenu_SetSelectedValue(interactionModeDD, prof.questInteractionCollapseBehavior or "skip_section")
 
         RefreshContainer(combatContainer, "combat", prof)
         RefreshQLCProfileDropdown()
         InitFilterModeDD()
+        InitInteractionModeDD()
     end
 
     basicPanel:HookScript("OnShow", basicPanel.OnShow)

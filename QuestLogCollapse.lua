@@ -130,6 +130,7 @@ local defaults = {
     debug = false,
     filterQuestsByZone = false,
     filterQuestsByZoneMode = "openworld",  -- "openworld" skips filtering inside instances
+    questInteractionCollapseBehavior = "skip_section", -- "off" | "skip_section" | "untrack_others"
     collapseQuests = false,  -- Disabled by default - causes taint
     collapseAchievements = true,
     collapseBonusObjectives = false,  -- Disabled by default - causes area POI taint
@@ -162,6 +163,75 @@ local function IsInDungeon()
     local instanceType = select(2, IsInInstance())
     return instanceType == "party" or instanceType == "raid" or instanceType == "scenario" or instanceType == "pvp" or
         instanceType == "arena" or instanceType == "neighborhood" or instanceType == "interior"
+end
+
+-- Returns quest IDs (from watched quests) that currently have a quest-item interaction button.
+local function GetTrackedInteractionQuestIDs()
+    local withInteraction = {}
+    local count = 0
+    local numTracked = C_QuestLog.GetNumQuestWatches()
+
+    for i = 1, numTracked do
+        local questID = C_QuestLog.GetQuestIDForQuestWatchIndex(i)
+        if questID and C_QuestLog.GetLogIndexForQuestID and GetQuestLogSpecialItemInfo then
+            local logIndex = C_QuestLog.GetLogIndexForQuestID(questID)
+            if logIndex and logIndex > 0 then
+                local itemLink, itemTexture = GetQuestLogSpecialItemInfo(logIndex)
+                if itemLink or itemTexture then
+                    withInteraction[questID] = true
+                    count = count + 1
+                end
+            end
+        end
+    end
+
+    return withInteraction, count
+end
+
+local function GetQuestInteractionCollapseBehavior()
+    local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or QuestLogCollapseDB
+    local behavior = profile and profile.questInteractionCollapseBehavior or "skip_section"
+    if behavior ~= "off" and behavior ~= "skip_section" and behavior ~= "untrack_others" then
+        behavior = "skip_section"
+    end
+    return behavior
+end
+
+-- Applies quest-interaction protection before collapsing the Quest tracker.
+-- Returns true when Quest collapse should continue, false when it should be skipped.
+local function PrepareQuestCollapse(isImmediateCombatPath)
+    local behavior = GetQuestInteractionCollapseBehavior()
+    if behavior == "off" then
+        return true
+    end
+
+    local interactionQuestIDs, interactionCount = GetTrackedInteractionQuestIDs()
+    if interactionCount == 0 then
+        return true
+    end
+
+    if behavior == "skip_section" then
+        DebugPrint("Skipping Quest collapse - tracked quest with interaction button detected (mode: skip section)")
+        return false
+    end
+
+    -- untrack_others mode
+    if isImmediateCombatPath or InCombatLockdown() then
+        DebugPrint("Skipping Quest immediate collapse - interaction mode is 'untrack others' but quest watches can't be safely changed in combat")
+        return false
+    end
+
+    local removed = 0
+    for i = C_QuestLog.GetNumQuestWatches(), 1, -1 do
+        local questID = C_QuestLog.GetQuestIDForQuestWatchIndex(i)
+        if questID and not interactionQuestIDs[questID] then
+            C_QuestLog.RemoveQuestWatch(questID)
+            removed = removed + 1
+        end
+    end
+
+    DebugPrint("Quest interaction mode active: kept " .. interactionCount .. " interaction quest(s) tracked and untracked " .. removed .. " other quest(s)")
+    return true
 end
 
 -- Safe function to collapse a tracker using secure methods
@@ -273,8 +343,13 @@ local function CollapseQuestLog()
     DebugPrint("Instance settings found and enabled, proceeding with collapse")
     local collapsed = 0
 
+    local shouldCollapseQuestTracker = settings.collapseQuests
+    if shouldCollapseQuestTracker then
+        shouldCollapseQuestTracker = PrepareQuestCollapse(false)
+    end
+
     -- Use safe collapse function for all trackers
-    if SafeCollapseTracker(QuestObjectiveTracker, "Quest", settings.collapseQuests) then
+    if SafeCollapseTracker(QuestObjectiveTracker, "Quest", shouldCollapseQuestTracker) then
         collapsed = collapsed + 1
     end
 
@@ -818,6 +893,8 @@ local function OnCombatStateChanged(event)
                     if wanted and tracker then
                         if TAINT_BLACKLIST[name] then
                             DebugPrint("Skipping " .. name .. " immediate collapse - blacklisted (causes UI taint)")
+                        elseif name == "Quest" and not PrepareQuestCollapse(true) then
+                            DebugPrint("Skipping Quest immediate collapse due to tracked interaction-button quest")
                         else
                             local ok, err = pcall(function()
                                 if tracker.SetCollapsed then

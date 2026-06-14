@@ -16,6 +16,7 @@ Optionally can filter quests to current zone (triggered by user actions to avoid
 - **Nameplate Integration**: Optional nameplate management for different instance types
 - **Debug Mode**: Optional debug messages to track addon behavior
 - **Manual Control**: Commands to manually collapse/expand configured sections
+- **Interaction-Button Quest Handling**: Optional safety behavior when tracked quests have interaction/use buttons
 - **Error-Safe Operation**: Protected against addon taint with comprehensive error handling
 - **Lightweight**: Minimal performance impact with efficient event handling
 
@@ -60,6 +61,7 @@ The addon features a comprehensive configuration panel accessible via `/qlc conf
 
 - `Enable QuestLogCollapse` (default: true) - Whether the addon is active
 - `Filter Quests by Current Zone` (default: false) - Track/Untrack quests in your current zone when you open the map, move, use an ability, mount/dismount, or use `/qlc filterzone`
+- `Quest Collapse Interaction Handling` (default: `Skip Quest section`) - When a tracked quest has an interaction/use button, either skip collapsing the Quest section, untrack other watched quests and collapse, or disable this behavior
 - `Debug Mode` (default: false) - Whether to show debug messages
 
 ### Profile Management
