@@ -237,6 +237,11 @@ Enable debug mode with `/qlc debug` to see detailed information about:
 - Addon initialization
 - Error handling and protected function calls
 
+## CONTRIBUTORS
+
+- **Gaspode** - Original author and maintainer
+- **Artherion77** - UI configuration panel revamp and usability improvements
+
 ## Contributing
 
 Feel free to submit issues, feature requests, or pull requests to improve this addon.
@@ -246,6 +251,13 @@ Feel free to submit issues, feature requests, or pull requests to improve this a
 This project is open source. Feel free to modify and distribute as needed.
 
 ## Changelog
+
+### Version 1.4.0
+
+- Significant code refactor and optimization for better performance and maintainability
+- **Significant UI Revamp**: Updated configuration panel with improved layout and usability (courtesy of Artherion77)
+- Updated documentation to reflect new zone filtering system and UI changes
+- Updated compatible version
 
 ### Version 1.3.2
 

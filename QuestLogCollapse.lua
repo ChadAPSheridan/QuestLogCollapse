@@ -1,6 +1,8 @@
 -- QuestLogCollapse: Automatically collapses quest log when entering dungeons
 -- Author: Gaspode
--- Version: 1.3.2
+-- Contributors: Artherion77
+-- Version: 1.4.0
+-- Updated: 2024-06-14
 
 -- TAINT PROTECTION STRATEGY:
 -- Implemented namespace to avoid global variable pollution
