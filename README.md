@@ -245,6 +245,7 @@ Enable debug mode with `/qlc debug` to see detailed information about:
 ## Contributing
 
 Feel free to submit issues, feature requests, or pull requests to improve this addon.
+***Please note: If you submit a PR, please tag me (@ChadAPSheridan) for a review, otherwise I may miss it.
 
 ## License
 
