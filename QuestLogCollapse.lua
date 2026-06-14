@@ -973,8 +973,7 @@ function SlashCmdList.QUESTLOGCOLLAPSE(msg)
         print("")
         print("|cff00ff00Zone Filtering:|r")
         print("• When enabled, zone filtering triggers automatically when you:")
-        print("  - Open the world map")
-        print("  - Open the quest log")
+        print("  - Interact with the quest tracker (minimize/expand)")
         print("  - Start moving after a zone change")
         print("  - Cast any spell/ability (including dynamic flight)")
         print("  - Mount or dismount")
@@ -1181,37 +1180,29 @@ local function TryRunZoneFilter()
     end
 end
 
--- Hook World Map opening (hardware-initiated: key press or mouse click)
--- The world map can be shown through multiple interfaces in modern WoW
-C_Timer.After(1, function()
-    -- WorldMapFrame might not exist immediately, retry until it does
-    local function HookWorldMap()
-        if WorldMapFrame then
-            if not WorldMapFrame.qlcHooked then
-                WorldMapFrame:HookScript("OnShow", function()
-                    DebugPrint("World map opened - checking for pending zone filter")
-                    TryRunZoneFilter()
-                end)
-                WorldMapFrame.qlcHooked = true
-                DebugPrint("Hooked WorldMapFrame for zone filtering")
-            end
-            return true
-        end
-        return false
-    end
-    
-    -- Try hooking immediately
-    if not HookWorldMap() then
-        -- If WorldMapFrame doesn't exist yet, keep trying
-        local attempts = 0
-        local ticker = C_Timer.NewTicker(1, function()
-            attempts = attempts + 1
-            if HookWorldMap() or attempts > 30 then
-                ticker:Cancel()
-            end
-        end)
-    end
-end)
+-- World map open trigger removed.
+--
+-- The previous attempt was a WorldMapFrame:HookScript("OnShow", ...) that
+-- deferred the filter via C_Timer.After(0, TryRunZoneFilter) to escape the
+-- map's protected init chain. The deferral is insufficient because the
+-- OnShow hook BODY itself executes synchronously inside ShowUIPanel →
+-- RefreshAll → secureexecuterange — that's where the addon's Lua frame
+-- enters the call stack and marks the chain tainted. Anything reachable
+-- after that point hits ADDON_ACTION_BLOCKED on Frame:SetPassThroughButtons
+-- / Button:SetPassThroughButtons (BonusObjectiveDataProvider:RefreshAllData,
+-- WorldQuestDataProvider:PingQuestID) on every world-map open.
+--
+-- The hook is removed entirely. Filtering still triggers on movement,
+-- spell/ability cast, mount/dismount, tracker minimize click, and
+-- /qlc filterzone. Convenience cost: filter no longer auto-runs on map
+-- open.
+--
+-- If a map-open trigger is wanted back, RegisterEvent("WORLD_MAP_OPEN") is
+-- the candidate. Per Gethe/wow-ui-source: that event is dispatched as
+-- WorldMapFrame's own OnEvent handler (which itself calls OpenWorldMap →
+-- HandleUserActionOpenSelf → ShowUIPanel), so other registered frames
+-- receive it as a sibling OnEvent dispatch rather than nested inside the
+-- protected init chain. Should be tested in isolation before adding back.
 
 -- Hook Quest Log / Objective Tracker interaction
 C_Timer.After(1, function()
@@ -1248,7 +1239,6 @@ C_Timer.After(1, function()
 end)
 
 DebugPrint("QuestLogCollapse: Zone filtering hooks initialized")
-DebugPrint("  - World map opening will trigger pending filters")
 DebugPrint("  - Quest tracker interaction will trigger pending filters")
 DebugPrint("  - Player movement will trigger pending filters")
 DebugPrint("  - Spell/ability cast will trigger pending filters")
