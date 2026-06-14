@@ -46,8 +46,7 @@ The addon provides several slash commands for basic control:
 
 ### Combat Behavior
 
-- **Early Combat Detection**: Quest trackers collapse via `PLAYER_ENTER_COMBAT` event (fires before taint protection)
-- **Fallback Collapse**: If early detection fails, attempts immediate collapse during `PLAYER_REGEN_DISABLED`
+- **Immediate Collapse on Combat Start**: Quest trackers collapse during `PLAYER_REGEN_DISABLED`, gated by the runtime `TAINT_BLACKLIST` so blacklisted trackers are not poked from addon Lua
 - **Automatic Expansion**: Quest trackers automatically expand when combat ends (only if they were collapsed during combat)
 - **Queue System**: If immediate collapse fails due to taint protection, operations are queued for when combat ends
 - **Smart Overrides**: Use `/qlc expand` during combat to cancel any queued collapse operations
@@ -128,8 +127,8 @@ The addon uses the World of Warcraft API to:
 
 ### Combat Queue System
 
-- **Early Detection**: Uses `PLAYER_ENTER_COMBAT` event for earliest possible collapse (before taint protection)
-- **Dual-Layer Approach**: Fallback to `PLAYER_REGEN_DISABLED` if early detection fails or is incomplete
+- **Single Trigger**: Uses `PLAYER_REGEN_DISABLED` to attempt the collapse synchronously
+- **Blacklist Gating**: Trackers in the runtime `TAINT_BLACKLIST` are skipped on both collapse and expand to avoid known UIWidget pool taint
 - **Smart Expansion**: Tracks which trackers were collapsed during combat and only expands those on combat end
 - **State Preservation**: Maintains quest log state when combat collapse is disabled or no trackers were affected
 - **Taint Prevention**: If both immediate attempts fail, operations are safely queued to prevent addon taint
@@ -157,15 +156,13 @@ QuestLogCollapse/
 - `PLAYER_STARTED_MOVING` - Triggers pending zone filter when player moves (hardware-initiated)
 - `UNIT_SPELLCAST_SUCCEEDED` - Triggers pending zone filter when player casts spells/abilities (hardware-initiated)
 - `PLAYER_MOUNT_DISPLAY_CHANGED` - Triggers pending zone filter when mounting/dismounting (hardware-initiated)
-- `PLAYER_ENTER_COMBAT` - Early combat detection for immediate collapse (before taint protection)
-- `PLAYER_REGEN_DISABLED` - Handle entering combat (fallback immediate collapse or queue operations)
-- `PLAYER_REGEN_ENABLED` - Handle leaving combat (apply queued operations)
+- `PLAYER_REGEN_DISABLED` - Handle entering combat (immediate collapse, gated by `TAINT_BLACKLIST`)
+- `PLAYER_REGEN_ENABLED` - Handle leaving combat (expand, apply queued operations)
 
 ### Zone Filtering Triggers (Taint-Safe)
 
 To avoid taint issues with protected quest tracking functions, zone filtering is triggered by user-initiated actions:
 
-- **World Map Opening** - Automatically triggers when you open the world map
 - **Quest Tracker Interaction** - Triggers when you interact with the objective tracker
 - **Player Movement** - Triggers when you start moving after a zone change
 - **Spell/Ability Use** - Triggers when you cast any spell or ability (including dynamic flight abilities)
