@@ -474,34 +474,6 @@ local function ExpandQuestLog()
         expanded = expanded + 1
     end
 
-    -- Try alternative method for the entire ObjectiveTrackerFrame
-    if ObjectiveTrackerFrame and not InCombatLockdown() then
-        local success, err = pcall(function()
-            if ObjectiveTrackerFrame.SetCollapsed then
-                ObjectiveTrackerFrame:SetCollapsed(false)
-                DebugPrint("ObjectiveTrackerFrame expanded")
-                expanded = expanded + 1
-            end
-
-            -- Also try expanding all modules
-            if ObjectiveTrackerFrame.MODULES then
-                for i, module in ipairs(ObjectiveTrackerFrame.MODULES) do
-                    if module and module.SetCollapsed then
-                        module:SetCollapsed(false)
-                        DebugPrint("Module " .. i .. " expanded")
-                        expanded = expanded + 1
-                    end
-                end
-            end
-        end)
-        
-        if not success then
-            DebugPrint("Failed to expand ObjectiveTrackerFrame: " .. tostring(err))
-        end
-    else
-        DebugPrint("ObjectiveTrackerFrame not found or in combat")
-    end
-
     DebugPrint("Expanded " .. expanded .. " sections/modules")
     
     -- Restore nameplate settings (only if the addon was controlling them)
