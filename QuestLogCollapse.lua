@@ -21,15 +21,24 @@ QuestLogCollapse:RegisterEvent("PLAYER_STARTED_MOVING")
 QuestLogCollapse:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
 QuestLogCollapse:RegisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
 
--- Trackers that cause taint issues - don't attempt to collapse these
--- This list is updated dynamically when taint is detected
+-- Trackers that must never be collapsed from addon Lua code.
+-- SetCollapsed() on any tracker that contains UIWidget-based content (status bars,
+-- capsules) causes UIWidgetManager:ProcessWidget → InitPartitions to run in a tainted
+-- execution context, which permanently taints the pooled StatusBar frame widths.
+-- Those poisoned widths then surface as "secret number" errors in LayoutFrame.lua
+-- and Blizzard_UIWidgetTemplateBase.lua whenever the GameTooltip or WorldMap later
+-- tries to lay out widget sets.  The pool frames are never size-reset on release,
+-- so the taint persists until /reload.
+--
+-- Keys here are the 'name' strings passed to SafeCollapseTracker/SafeExpandTracker.
+-- Dynamic per-session additions are also written here when a pcall catches a taint error.
 local TAINT_BLACKLIST = {
-    -- UIWidgetObjectiveTracker = true,
-    -- AdventureMapQuestObjectiveTracker = true,
-    -- QuestDataProvider = true,
-    -- QuestObjectiveTracker = true,  -- Causes widget taint
-    -- WorldQuestObjectiveTracker = true,  -- Causes map system taint
-    -- BonusObjectiveTracker = true,  -- Causes area POI taint
+    ["UI widgets"]          = true,  -- UIWidgetObjectiveTracker: directly manages widget pool frames
+    ["Monthly activities"]  = true,  -- MonthlyActivitiesObjectiveTracker: UIWidget status bars for seasonal/event progress
+    ["Adventure map"]      = true,  -- AdventureMapQuestObjectiveTracker: causes world map taint (collapseAdventureMaps defaults false; safety net for users who enable it)
+    ["World quest"]        = true,  -- WorldQuestObjectiveTracker: causes map system taint (collapseWorldQuests defaults false; safety net for users who enable it)
+    ["Bonus objectives"]   = true,  -- BonusObjectiveTracker: SetCollapsed taints UIWidget pool frame widths → LayoutFrame:491 "secret number" on Area POI tooltips
+    ["Quest"]              = true,  -- QuestObjectiveTracker: SetCollapsed taints widget pool frame dimensions when the tracker holds quests with embedded reward / UIWidget content (delve coffer-key timers, world quest reward icons). Confirmed reproducer: tracked World Quest in the log → hover any World Quest pin on the world map → 38× "attempt to perform arithmetic on a secret number value" at Blizzard_GameTooltip/Mainline/GameTooltip.lua:754 (EmbeddedItemTooltip_UpdateSize). Also surfaces at LayoutFrame:491 / UIWidgetTemplateTextWithState:35 in Area POI tooltips.
 }
 
 -- Helper function to check if a value is tainted
@@ -103,6 +112,16 @@ local questTrackingState = {
 -- This flag approach allows the filter to run from hardware-initiated events without taint
 local needsZoneFilter = false
 
+-- "Have we installed the HookScript already?" guards. Kept as file-locals rather
+-- than as fields on the Blizzard frames themselves: writing a custom key onto a
+-- Blizzard frame from addon-tainted code marks the frame's table as tainted,
+-- which subsequently blocks every protected operation dispatched against it
+-- (e.g. ObjectiveTrackerFrame:Show / mixin'd methods on world-map open). See
+-- the commit that introduced these for the ADDON_ACTION_BLOCKED Frame:Show
+-- repro.
+local mapFrameHooked = false
+local minimizeButtonHooked = false
+
 -- Default settings
 local defaults = {
     enabled = true,
@@ -115,7 +134,7 @@ local defaults = {
     collapseScenarios = true,
     collapseCampaigns = true,
     collapseProfessions = true,
-    collapseMonthlyActivities = true,
+    collapseMonthlyActivities = false,  -- Disabled by default - UIWidget status bars cause taint
     collapseUIWidgets = false,  -- Disabled by default - causes widget taint
     collapseAdventureMaps = false,  -- Disabled by default - causes map taint
     collapseWorldQuests = false,  -- Disabled by default - causes map taint
@@ -212,29 +231,18 @@ local function SafeCollapseTracker(tracker, name, shouldCollapse)
                     -- Add to taint blacklist for this session
                     TAINT_BLACKLIST[name] = true
                 else
-                    DebugPrint("Method 1 failed for " .. name .. ": " .. tostring(err))
-                    
-                    -- Method 2: Try using the collapsed property directly
-                    local ok2, err2 = pcall(function()
-                        if tracker then
-                            tracker.collapsed = true
-                            if tracker.Update then
-                                tracker:Update()
-                            end
-                        end
-                    end)
-                    
-                    if ok2 then
-                        DebugPrint(name .. " section collapsed using property method")
-                        success = true
-                    else
-                        DebugPrint("All methods failed for " .. name .. ": " .. tostring(err2))
-                    end
+                    -- Don't try a `tracker.collapsed = true` direct property write as a
+                    -- fallback — that taints the Blizzard tracker frame just as badly as
+                    -- the SetCollapsed API call (writing arbitrary keys onto a Blizzard
+                    -- frame from addon-tainted code marks the table as tainted, blocking
+                    -- every later protected operation on it). Leave the tracker in
+                    -- whatever state SetCollapsed left it.
+                    DebugPrint("SetCollapsed failed for " .. name .. ": " .. tostring(err) .. " (no fallback — direct property write would taint)")
                 end
             end
         end)
     end
-    
+
     return true
 end
 
@@ -397,29 +405,15 @@ local function SafeExpandTracker(tracker, name)
                     -- Add to taint blacklist for this session
                     TAINT_BLACKLIST[name] = true
                 else
-                    DebugPrint("Method 1 failed for " .. name .. ": " .. tostring(err))
-                    
-                    -- Method 2: Try using the collapsed property directly
-                    local ok2, err2 = pcall(function()
-                        if tracker then
-                            tracker.collapsed = false
-                            if tracker.Update then
-                                tracker:Update()
-                            end
-                        end
-                    end)
-                    
-                    if ok2 then
-                        DebugPrint(name .. " section expanded using property method")
-                        success = true
-                    else
-                        DebugPrint("All methods failed for " .. name .. ": " .. tostring(err2))
-                    end
+                    -- Don't try a `tracker.collapsed = false` direct property write as
+                    -- a fallback — same anti-pattern as SafeCollapseTracker's removed
+                    -- Method 2.
+                    DebugPrint("SetCollapsed(false) failed for " .. name .. ": " .. tostring(err) .. " (no fallback — direct property write would taint)")
                 end
             end
         end)
     end
-    
+
     return true
 end
 
@@ -475,34 +469,6 @@ local function ExpandQuestLog()
 
     if SafeExpandTracker(WorldQuestObjectiveTracker, "World quest") then
         expanded = expanded + 1
-    end
-
-    -- Try alternative method for the entire ObjectiveTrackerFrame
-    if ObjectiveTrackerFrame and not InCombatLockdown() then
-        local success, err = pcall(function()
-            if ObjectiveTrackerFrame.SetCollapsed then
-                ObjectiveTrackerFrame:SetCollapsed(false)
-                DebugPrint("ObjectiveTrackerFrame expanded")
-                expanded = expanded + 1
-            end
-
-            -- Also try expanding all modules
-            if ObjectiveTrackerFrame.MODULES then
-                for i, module in ipairs(ObjectiveTrackerFrame.MODULES) do
-                    if module and module.SetCollapsed then
-                        module:SetCollapsed(false)
-                        DebugPrint("Module " .. i .. " expanded")
-                        expanded = expanded + 1
-                    end
-                end
-            end
-        end)
-        
-        if not success then
-            DebugPrint("Failed to expand ObjectiveTrackerFrame: " .. tostring(err))
-        end
-    else
-        DebugPrint("ObjectiveTrackerFrame not found or in combat")
     end
 
     DebugPrint("Expanded " .. expanded .. " sections/modules")
@@ -826,88 +792,43 @@ local function OnCombatStateChanged(event)
             -- Check if combat collapse is enabled
             local settings = ns.GetCurrentInstanceSettings and ns.GetCurrentInstanceSettings()
             if settings and settings.enabled then
-                DebugPrint("PLAYER_REGEN_DISABLED fired - checking if early combat already handled collapse")
-                
-                -- Check if early combat detection already handled the collapse
-                if combatStateQueue.enteredCombatOutsideInstance and not combatStateQueue.shouldCollapseOnCombatEnd then
-                    DebugPrint("Early combat detection already handled collapse - skipping duplicate attempt")
-                    return
-                end
-                
-                DebugPrint("Early combat did not fully handle collapse - attempting immediate collapse")
-                
-                -- Try to collapse immediately (before taint protection fully kicks in)
-                -- This is a backup in case PLAYER_ENTER_COMBAT didn't fire or failed
+                DebugPrint("PLAYER_REGEN_DISABLED fired - attempting immediate collapse")
+
+                -- Try to collapse immediately. SafeCollapseTracker can't run during
+                -- combat, so this direct path is the only one that can take effect
+                -- before InCombatLockdown blocks further frame manipulation.
                 local collapsed = 0
                 
                 -- Attempt immediate collapse of each enabled tracker
-                if settings.collapseQuests and QuestObjectiveTracker then
-                    local ok, err = pcall(function()
-                        if QuestObjectiveTracker.SetCollapsed then
-                            QuestObjectiveTracker:SetCollapsed(true)
-                            collapsed = collapsed + 1
+                -- Trackers in TAINT_BLACKLIST are skipped here too, mirroring SafeCollapseTracker.
+                -- Without this gate, the immediate path bypasses the blacklist on collapse while
+                -- SafeExpandTracker still honors it on expand, leaving blacklisted trackers stuck
+                -- collapsed forever. See TAINT_BLACKLIST comments for the underlying taint chains.
+                local immediates = {
+                    { settings.collapseQuests,          QuestObjectiveTracker,         "Quest" },
+                    { settings.collapseAchievements,    AchievementObjectiveTracker,   "Achievement" },
+                    { settings.collapseBonusObjectives, BonusObjectiveTracker,         "Bonus objectives" },
+                    { settings.collapseCampaigns,       CampaignQuestObjectiveTracker, "Campaign" },
+                    { settings.collapseWorldQuests,     WorldQuestObjectiveTracker,    "World quest" },
+                }
+                for _, def in ipairs(immediates) do
+                    local wanted, tracker, name = def[1], def[2], def[3]
+                    if wanted and tracker then
+                        if TAINT_BLACKLIST[name] then
+                            DebugPrint("Skipping " .. name .. " immediate collapse - blacklisted (causes UI taint)")
+                        else
+                            local ok, err = pcall(function()
+                                if tracker.SetCollapsed then
+                                    tracker:SetCollapsed(true)
+                                    collapsed = collapsed + 1
+                                end
+                            end)
+                            if ok then
+                                DebugPrint(name .. " tracker immediately collapsed in combat")
+                            else
+                                DebugPrint("Failed to immediately collapse " .. name .. " tracker: " .. tostring(err))
+                            end
                         end
-                    end)
-                    if ok then
-                        DebugPrint("Quest tracker immediately collapsed in combat")
-                    else
-                        DebugPrint("Failed to immediately collapse quest tracker: " .. tostring(err))
-                    end
-                end
-                
-                if settings.collapseAchievements and AchievementObjectiveTracker then
-                    local ok, err = pcall(function()
-                        if AchievementObjectiveTracker.SetCollapsed then
-                            AchievementObjectiveTracker:SetCollapsed(true)
-                            collapsed = collapsed + 1
-                        end
-                    end)
-                    if ok then
-                        DebugPrint("Achievement tracker immediately collapsed in combat")
-                    else
-                        DebugPrint("Failed to immediately collapse achievement tracker: " .. tostring(err))
-                    end
-                end
-                
-                if settings.collapseBonusObjectives and BonusObjectiveTracker then
-                    local ok, err = pcall(function()
-                        if BonusObjectiveTracker.SetCollapsed then
-                            BonusObjectiveTracker:SetCollapsed(true)
-                            collapsed = collapsed + 1
-                        end
-                    end)
-                    if ok then
-                        DebugPrint("Bonus objectives tracker immediately collapsed in combat")
-                    else
-                        DebugPrint("Failed to immediately collapse bonus objectives tracker: " .. tostring(err))
-                    end
-                end
-                
-                if settings.collapseCampaigns and CampaignQuestObjectiveTracker then
-                    local ok, err = pcall(function()
-                        if CampaignQuestObjectiveTracker.SetCollapsed then
-                            CampaignQuestObjectiveTracker:SetCollapsed(true)
-                            collapsed = collapsed + 1
-                        end
-                    end)
-                    if ok then
-                        DebugPrint("Campaign tracker immediately collapsed in combat")
-                    else
-                        DebugPrint("Failed to immediately collapse campaign tracker: " .. tostring(err))
-                    end
-                end
-                
-                if settings.collapseWorldQuests and WorldQuestObjectiveTracker then
-                    local ok, err = pcall(function()
-                        if WorldQuestObjectiveTracker.SetCollapsed then
-                            WorldQuestObjectiveTracker:SetCollapsed(true)
-                            collapsed = collapsed + 1
-                        end
-                    end)
-                    if ok then
-                        DebugPrint("World quest tracker immediately collapsed in combat")
-                    else
-                        DebugPrint("Failed to immediately collapse world quest tracker: " .. tostring(err))
                     end
                 end
                 
@@ -970,121 +891,6 @@ local function OnCombatStateChanged(event)
     end
 end
 
--- Early combat detection - this fires before PLAYER_REGEN_DISABLED
-local function OnEarlyCombat(event)
-    local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or QuestLogCollapseDB
-    if not profile or not profile.enabled then
-        DebugPrint("Addon disabled or no profile found")
-        return
-    end
-    
-    -- Make sure we're not in a dungeon to avoid conflicts
-    if not IsInDungeon() then
-        if event == "PLAYER_ENTER_COMBAT" then
-            -- Check if combat collapse is enabled
-            local settings = ns.GetCurrentInstanceSettings and ns.GetCurrentInstanceSettings()
-            if settings and settings.enabled then
-                DebugPrint("Early combat detection (PLAYER_ENTER_COMBAT) - attempting immediate collapse")
-                
-                -- Try to collapse immediately - this happens BEFORE taint protection
-                local collapsed = 0
-                
-                -- Attempt immediate collapse of each enabled tracker
-                if settings.collapseQuests and QuestObjectiveTracker then
-                    local ok, err = pcall(function()
-                        if QuestObjectiveTracker.SetCollapsed then
-                            QuestObjectiveTracker:SetCollapsed(true)
-                            collapsed = collapsed + 1
-                        end
-                    end)
-                    if ok then
-                        DebugPrint("Quest tracker collapsed via early combat detection")
-                    else
-                        DebugPrint("Failed early collapse of quest tracker: " .. tostring(err))
-                    end
-                end
-                
-                if settings.collapseAchievements and AchievementObjectiveTracker then
-                    local ok, err = pcall(function()
-                        if AchievementObjectiveTracker.SetCollapsed then
-                            AchievementObjectiveTracker:SetCollapsed(true)
-                            collapsed = collapsed + 1
-                        end
-                    end)
-                    if ok then
-                        DebugPrint("Achievement tracker collapsed via early combat detection")
-                    else
-                        DebugPrint("Failed early collapse of achievement tracker: " .. tostring(err))
-                    end
-                end
-                
-                if settings.collapseBonusObjectives and BonusObjectiveTracker then
-                    local ok, err = pcall(function()
-                        if BonusObjectiveTracker.SetCollapsed then
-                            BonusObjectiveTracker:SetCollapsed(true)
-                            collapsed = collapsed + 1
-                        end
-                    end)
-                    if ok then
-                        DebugPrint("Bonus objectives tracker collapsed via early combat detection")
-                    else
-                        DebugPrint("Failed early collapse of bonus objectives tracker: " .. tostring(err))
-                    end
-                end
-                
-                if settings.collapseCampaigns and CampaignQuestObjectiveTracker then
-                    local ok, err = pcall(function()
-                        if CampaignQuestObjectiveTracker.SetCollapsed then
-                            CampaignQuestObjectiveTracker:SetCollapsed(true)
-                            collapsed = collapsed + 1
-                        end
-                    end)
-                    if ok then
-                        DebugPrint("Campaign tracker collapsed via early combat detection")
-                    else
-                        DebugPrint("Failed early collapse of campaign tracker: " .. tostring(err))
-                    end
-                end
-                
-                if settings.collapseWorldQuests and WorldQuestObjectiveTracker then
-                    local ok, err = pcall(function()
-                        if WorldQuestObjectiveTracker.SetCollapsed then
-                            WorldQuestObjectiveTracker:SetCollapsed(true)
-                            collapsed = collapsed + 1
-                        end
-                    end)
-                    if ok then
-                        DebugPrint("World quest tracker collapsed via early combat detection")
-                    else
-                        DebugPrint("Failed early collapse of world quest tracker: " .. tostring(err))
-                    end
-                end
-                
-                if collapsed > 0 then
-                    DebugPrint("Successfully collapsed " .. collapsed .. " trackers via early combat detection")
-                    -- Mark that we successfully handled combat collapse early and need to expand on combat end
-                    combatStateQueue.enteredCombatOutsideInstance = true
-                    combatStateQueue.shouldCollapseOnCombatEnd = false
-                    combatStateQueue.shouldExpandOnCombatEnd = false
-                    combatStateQueue.trackersWereCollapsedInCombat = true
-                else
-                    DebugPrint("No trackers collapsed via early detection - will try again on PLAYER_REGEN_DISABLED")
-                    -- Still mark that we're in combat outside instance for potential later operations
-                    combatStateQueue.enteredCombatOutsideInstance = true
-                    combatStateQueue.trackersWereCollapsedInCombat = false
-                end
-            else
-                DebugPrint("Combat collapse not enabled for this profile")
-                -- Still mark that we entered combat outside instance for potential manual interaction
-                combatStateQueue.enteredCombatOutsideInstance = true
-                combatStateQueue.shouldCollapseOnCombatEnd = false
-                combatStateQueue.shouldExpandOnCombatEnd = false
-            end
-        end
-    else
-        DebugPrint("In dungeon/instance - skipping early combat detection")
-    end
-end
 -- Event handler
 QuestLogCollapse:SetScript("OnEvent", function(self, event, ...)
     if event == "ADDON_LOADED" then
@@ -1166,16 +972,15 @@ function SlashCmdList.QUESTLOGCOLLAPSE(msg)
         print("|cffff0000/qlc config|r - Open configuration panel")
         print("")
         print("|cff00ff00Combat Behavior:|r")
-        print("• Quest trackers collapse via early combat detection (PLAYER_ENTER_COMBAT)")
-        print("• Fallback attempt during PLAYER_REGEN_DISABLED if early detection fails")
+        print("• Quest trackers collapse on PLAYER_REGEN_DISABLED (combat start)")
+        print("• Trackers in the runtime taint blacklist are skipped")
         print("• Quest trackers automatically expand when combat ends (outside instances)")
         print("• If immediate collapse fails, operations are queued for when combat ends")
         print("• Use |cffff0000/qlc expand|r during combat to cancel queued operations")
         print("")
         print("|cff00ff00Zone Filtering:|r")
         print("• When enabled, zone filtering triggers automatically when you:")
-        print("  - Open the world map")
-        print("  - Open the quest log")
+        print("  - Interact with the quest tracker (minimize/expand)")
         print("  - Start moving after a zone change")
         print("  - Cast any spell/ability (including dynamic flight)")
         print("  - Mount or dismount")
@@ -1385,27 +1190,22 @@ end
 -- Hook World Map opening (hardware-initiated: key press or mouse click)
 -- The world map can be shown through multiple interfaces in modern WoW
 C_Timer.After(1, function()
-    -- WorldMapFrame might not exist immediately, retry until it does
     local function HookWorldMap()
-        if WorldMapFrame then
-            if not WorldMapFrame.qlcHooked then
-                WorldMapFrame:HookScript("OnShow", function()
-                    DebugPrint("World map opened - checking for pending zone filter")
-                    TryRunZoneFilter()
-                end)
-                WorldMapFrame.qlcHooked = true
-                DebugPrint("Hooked WorldMapFrame for zone filtering")
-            end
-            return true
-        end
-        return false
+        if mapFrameHooked then return true end
+        if not WorldMapFrame then return false end
+        WorldMapFrame:HookScript("OnShow", function()
+            DebugPrint("World map opened - checking for pending zone filter")
+            TryRunZoneFilter()
+        end)
+        mapFrameHooked = true
+        DebugPrint("Hooked WorldMapFrame for zone filtering")
+        return true
     end
-    
-    -- Try hooking immediately
+
     if not HookWorldMap() then
-        -- If WorldMapFrame doesn't exist yet, keep trying
         local attempts = 0
-        local ticker = C_Timer.NewTicker(1, function()
+        local ticker
+        ticker = C_Timer.NewTicker(1, function()
             attempts = attempts + 1
             if HookWorldMap() or attempts > 30 then
                 ticker:Cancel()
@@ -1414,32 +1214,36 @@ C_Timer.After(1, function()
     end
 end)
 
--- Hook Quest Log / Objective Tracker interaction
+-- Hook Quest Log / Objective Tracker interaction.
+-- Modern retail moved the minimize button from `ObjectiveTrackerFrame.HeaderMenu`
+-- to `ObjectiveTrackerFrame.Header`; we probe both rather than hard-code one.
+local function FindTrackerMinimizeButton()
+    local OT = ObjectiveTrackerFrame
+    if not OT then return nil end
+    if OT.Header     and OT.Header.MinimizeButton     then return OT.Header.MinimizeButton     end
+    if OT.HeaderMenu and OT.HeaderMenu.MinimizeButton then return OT.HeaderMenu.MinimizeButton end
+    if OT.MinimizeButton                              then return OT.MinimizeButton            end
+    return nil
+end
+
 C_Timer.After(1, function()
     local function HookQuestLog()
-        -- Modern WoW uses ObjectiveTrackerFrame
-        if ObjectiveTrackerFrame then
-            if not ObjectiveTrackerFrame.qlcHooked then
-                -- Hook the minimize/maximize button click which is hardware-initiated
-                if ObjectiveTrackerFrame.HeaderMenu and ObjectiveTrackerFrame.HeaderMenu.MinimizeButton then
-                    ObjectiveTrackerFrame.HeaderMenu.MinimizeButton:HookScript("OnMouseDown", function()
-                        DebugPrint("Quest tracker interacted with - checking for pending zone filter")
-                        TryRunZoneFilter()
-                    end)
-                end
-                ObjectiveTrackerFrame.qlcHooked = true
-                DebugPrint("Hooked ObjectiveTrackerFrame for zone filtering")
-            end
-            return true
-        end
-        return false
+        if minimizeButtonHooked then return true end
+        local btn = FindTrackerMinimizeButton()
+        if not btn then return false end
+        btn:HookScript("OnMouseDown", function()
+            DebugPrint("Quest tracker interacted with - checking for pending zone filter")
+            TryRunZoneFilter()
+        end)
+        minimizeButtonHooked = true
+        DebugPrint("Hooked tracker minimize button for zone filtering")
+        return true
     end
-    
-    -- Try hooking immediately
+
     if not HookQuestLog() then
-        -- If ObjectiveTrackerFrame doesn't exist yet, keep trying
         local attempts = 0
-        local ticker = C_Timer.NewTicker(1, function()
+        local ticker
+        ticker = C_Timer.NewTicker(1, function()
             attempts = attempts + 1
             if HookQuestLog() or attempts > 30 then
                 ticker:Cancel()
@@ -1449,7 +1253,6 @@ C_Timer.After(1, function()
 end)
 
 DebugPrint("QuestLogCollapse: Zone filtering hooks initialized")
-DebugPrint("  - World map opening will trigger pending filters")
 DebugPrint("  - Quest tracker interaction will trigger pending filters")
 DebugPrint("  - Player movement will trigger pending filters")
 DebugPrint("  - Spell/ability cast will trigger pending filters")
