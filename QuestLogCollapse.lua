@@ -34,11 +34,11 @@ QuestLogCollapse:RegisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
 -- Dynamic per-session additions are also written here when a pcall catches a taint error.
 local TAINT_BLACKLIST = {
     ["UI widgets"]          = true,  -- UIWidgetObjectiveTracker: directly manages widget pool frames
-    ["Monthly activities"]  = true,  -- MonthlyActivitiesObjectiveTracker: UIWidget status bars for seasonal/event progress
-    ["Adventure map"]      = true,  -- AdventureMapQuestObjectiveTracker: causes world map taint (collapseAdventureMaps defaults false; safety net for users who enable it)
-    ["World quest"]        = true,  -- WorldQuestObjectiveTracker: causes map system taint (collapseWorldQuests defaults false; safety net for users who enable it)
-    ["Bonus objectives"]   = true,  -- BonusObjectiveTracker: SetCollapsed taints UIWidget pool frame widths → LayoutFrame:491 "secret number" on Area POI tooltips
-    ["Quest"]              = true,  -- QuestObjectiveTracker: SetCollapsed taints widget pool frame dimensions when the tracker holds quests with embedded reward / UIWidget content (delve coffer-key timers, world quest reward icons). Confirmed reproducer: tracked World Quest in the log → hover any World Quest pin on the world map → 38× "attempt to perform arithmetic on a secret number value" at Blizzard_GameTooltip/Mainline/GameTooltip.lua:754 (EmbeddedItemTooltip_UpdateSize). Also surfaces at LayoutFrame:491 / UIWidgetTemplateTextWithState:35 in Area POI tooltips.
+    ["Monthly activities"]  = false,  -- MonthlyActivitiesObjectiveTracker: UIWidget status bars for seasonal/event progress
+    ["Adventure map"]      = false,  -- AdventureMapQuestObjectiveTracker: causes world map taint (collapseAdventureMaps defaults false; safety net for users who enable it)
+    ["World quest"]        = false,  -- WorldQuestObjectiveTracker: causes map system taint (collapseWorldQuests defaults false; safety net for users who enable it)
+    ["Bonus objectives"]   = false,  -- BonusObjectiveTracker: SetCollapsed taints UIWidget pool frame widths → LayoutFrame:491 "secret number" on Area POI tooltips
+    ["Quest"]              = false,  -- QuestObjectiveTracker: SetCollapsed taints widget pool frame dimensions when the tracker holds quests with embedded reward / UIWidget content (delve coffer-key timers, world quest reward icons). Confirmed reproducer: tracked World Quest in the log → hover any World Quest pin on the world map → 38× "attempt to perform arithmetic on a secret number value" at Blizzard_GameTooltip/Mainline/GameTooltip.lua:754 (EmbeddedItemTooltip_UpdateSize). Also surfaces at LayoutFrame:491 / UIWidgetTemplateTextWithState:35 in Area POI tooltips.
 }
 
 -- Helper function to check if a value is tainted
@@ -167,26 +167,26 @@ local function SafeCollapseTracker(tracker, name, shouldCollapse)
     if not isFullyLoaded or not tracker or not shouldCollapse then
         return false
     end
-    
+
     -- NEVER manipulate trackers during combat to avoid taint
     if InCombatLockdown() then
         DebugPrint("Skipping " .. name .. " collapse - in combat")
         return false
     end
-    
+
     -- Skip blacklisted trackers that cause taint
     if TAINT_BLACKLIST[name] then
         DebugPrint("Skipping " .. name .. " collapse - blacklisted (causes UI taint)")
         return false
     end
-    
+
     -- Also check by tracker object reference
     local trackerName = tracker and tracker:GetName()
     if trackerName and TAINT_BLACKLIST[trackerName] then
         DebugPrint("Skipping " .. name .. " collapse - blacklisted by object name (" .. trackerName .. ")")
         return false
     end
-    
+
     -- Avoid operations when map system might be busy
     if mapSystemBusy then
         DebugPrint("Deferring " .. name .. " collapse - map system busy")
@@ -194,33 +194,33 @@ local function SafeCollapseTracker(tracker, name, shouldCollapse)
         pendingOperations[name] = {action = "collapse", tracker = tracker}
         return true
     end
-    
+
     -- Check if this operation is already pending
     if pendingOperations[name] then
         DebugPrint("Operation already pending for " .. name)
         return true
     end
-    
+
     -- Use secure execution with frame script
     local success = false
-    
+
     -- Wrap in error handler to catch and suppress taint errors
     if tracker.SetCollapsed and type(tracker.SetCollapsed) == "function" then
         local executeFrame = CreateFrame("Frame")
         executeFrame:SetScript("OnUpdate", function(self)
             self:SetScript("OnUpdate", nil)
-            
+
             if InCombatLockdown() then
                 DebugPrint("Combat started, aborting " .. name .. " collapse")
                 return
             end
-            
+
             local ok, err = pcall(function()
                 if tracker and tracker.SetCollapsed then
                     tracker:SetCollapsed(true)
                 end
             end)
-            
+
             if ok then
                 DebugPrint(name .. " section collapsed successfully")
                 success = true
@@ -252,7 +252,7 @@ local function CollapseQuestLog()
         DebugPrint("CollapseQuestLog() skipped - in combat")
         return
     end
-    
+
     -- Get instance-specific settings from config system
     local settings = ns.GetCurrentInstanceSettings and ns.GetCurrentInstanceSettings()
 
@@ -313,7 +313,7 @@ local function CollapseQuestLog()
     end
 
     DebugPrint("Collapsed " .. collapsed .. " sections")
-    
+
     -- Handle nameplate settings (only if not in combat)
     if settings.namePlates and settings.namePlates.enabled and not InCombatLockdown() then
         DebugPrint("Enabling ENEMY nameplates for instance")
@@ -341,26 +341,26 @@ local function SafeExpandTracker(tracker, name)
         DebugPrint(name .. " not found or not fully loaded")
         return false
     end
-    
+
     -- NEVER manipulate trackers during combat to avoid taint
     if InCombatLockdown() then
         DebugPrint("Skipping " .. name .. " expand - in combat")
         return false
     end
-    
+
     -- Skip blacklisted trackers that cause taint
     if TAINT_BLACKLIST[name] then
         DebugPrint("Skipping " .. name .. " expand - blacklisted (causes UI taint)")
         return false
     end
-    
+
     -- Also check by tracker object reference
     local trackerName = tracker and tracker:GetName()
     if trackerName and TAINT_BLACKLIST[trackerName] then
         DebugPrint("Skipping " .. name .. " expand - blacklisted by object name (" .. trackerName .. ")")
         return false
     end
-    
+
     -- Avoid operations when map system might be busy
     if mapSystemBusy then
         DebugPrint("Deferring " .. name .. " expand - map system busy")
@@ -368,33 +368,33 @@ local function SafeExpandTracker(tracker, name)
         pendingOperations[name] = {action = "expand", tracker = tracker}
         return true
     end
-    
+
     -- Check if this operation is already pending
     if pendingOperations[name] then
         DebugPrint("Operation already pending for " .. name)
         return true
     end
-    
+
     -- Use secure execution with frame script
     local success = false
-    
+
     -- Wrap in error handler to catch and suppress taint errors
     if tracker.SetCollapsed and type(tracker.SetCollapsed) == "function" then
         local executeFrame = CreateFrame("Frame")
         executeFrame:SetScript("OnUpdate", function(self)
             self:SetScript("OnUpdate", nil)
-            
+
             if InCombatLockdown() then
                 DebugPrint("Combat started, aborting " .. name .. " expand")
                 return
             end
-            
+
             local ok, err = pcall(function()
                 if tracker and tracker.SetCollapsed then
                     tracker:SetCollapsed(false)
                 end
             end)
-            
+
             if ok then
                 DebugPrint(name .. " section expanded successfully")
                 success = true
@@ -423,7 +423,7 @@ local function ExpandQuestLog()
         DebugPrint("ExpandQuestLog() skipped - in combat")
         return
     end
-    
+
     -- When leaving an instance, expand all sections regardless of settings
     -- This ensures we restore the original state
 
@@ -472,7 +472,7 @@ local function ExpandQuestLog()
     end
 
     DebugPrint("Expanded " .. expanded .. " sections/modules")
-    
+
     -- Restore nameplate settings (only if the addon was controlling them)
     if namePlateState.addonControlled and not InCombatLockdown() then
         DebugPrint("Restoring original ENEMY nameplate state: " .. tostring(namePlateState.originalShowAll))
@@ -480,14 +480,14 @@ local function ExpandQuestLog()
         DebugPrint("Before restore - nameplateShowAll: " .. tostring(GetCVar("nameplateShowAll")))
         DebugPrint("Before restore - nameplateShowEnemies: " .. tostring(GetCVar("nameplateShowEnemies")))
         DebugPrint("Before restore - nameplateShowFriends: " .. tostring(GetCVar("nameplateShowFriends")))
-        
+
         SetCVar("nameplateShowEnemies", namePlateState.originalShowAll or "0")
-        
+
         -- Debug: Show state after restoration
         DebugPrint("After restore - nameplateShowAll: " .. tostring(GetCVar("nameplateShowAll")))
         DebugPrint("After restore - nameplateShowEnemies: " .. tostring(GetCVar("nameplateShowEnemies")))
         DebugPrint("After restore - nameplateShowFriends: " .. tostring(GetCVar("nameplateShowFriends")))
-        
+
         namePlateState.addonControlled = false
         namePlateState.originalShowAll = nil
     end
@@ -505,7 +505,7 @@ local function FilterQuestsByZone()
         DebugPrint("FilterQuestsByZone() skipped - in combat")
         return
     end
-    
+
     local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or QuestLogCollapseDB
     if not profile or not profile.filterQuestsByZone then
         needsZoneFilter = false  -- Clear the flag
@@ -522,7 +522,7 @@ local function FilterQuestsByZone()
 
     -- Clear the flag since we're running now
     needsZoneFilter = false
-    
+
     DebugPrint("========================================")
     DebugPrint("=== FILTERING QUESTS BY CURRENT ZONE ===")
     DebugPrint("========================================")
@@ -531,39 +531,39 @@ local function FilterQuestsByZone()
             DebugPrint("Combat started, skipping quest filtering")
             return
         end
-        
+
         -- Get current zone
         local currentMapID = C_Map.GetBestMapForUnit("player")
         local currentMapInfo = currentMapID and C_Map.GetMapInfo(currentMapID)
-        
+
         DebugPrint("Current map ID: " .. tostring(currentMapID))
         if currentMapInfo then
             DebugPrint("Current map name: '" .. (currentMapInfo.name or "unknown") .. "'")
         end
-        
+
         if not currentMapID then
             DebugPrint("Unable to determine current zone, skipping quest filtering")
             return
         end
-        
+
         -- Helper function to check if a quest is in the current zone
         local function IsQuestInCurrentZone(questID, questInfo)
             -- Check if the quest has markers or objectives in the current zone
             -- isOnMap = quest objectives/markers are on the current zone's map
             -- hasLocalPOI = quest has a Point of Interest in the current zone
-            
+
             local isOnCurrentMap = questInfo and questInfo.isOnMap
             local hasLocalMarker = questInfo and questInfo.hasLocalPOI
-            
+
             DebugPrint("  Quest " .. questID .. ": isOnMap=" .. tostring(isOnCurrentMap) .. ", hasLocalPOI=" .. tostring(hasLocalMarker))
-            
+
             if isOnCurrentMap or hasLocalMarker then
                 return true, "has objectives/markers in current zone"
             else
                 return false, "no objectives/markers in current zone"
             end
         end
-        
+
         -- Step 1: Untrack quests not in current zone
         local untracked = 0
         local kept = 0
@@ -596,10 +596,10 @@ local function FilterQuestsByZone()
                         break
                     end
                 end
-                
+
                 DebugPrint("Examining tracked quest " .. questID .. " (index " .. i .. ")")
                 local isInCurrentZone, reason = IsQuestInCurrentZone(questID, trackedQuestInfo)
-                
+
                 if not isInCurrentZone then
                     C_QuestLog.RemoveQuestWatch(questID)
                     DebugPrint(">>> UNTRACKED quest " .. questID .. " - " .. reason)
@@ -612,22 +612,22 @@ local function FilterQuestsByZone()
                 DebugPrint("Warning: No questID at watch index " .. i)
             end
         end
-        
+
         DebugPrint("=== Step 1 complete: kept " .. kept .. ", untracked " .. untracked .. " ===")
-        
+
         -- Step 2: Track quests that ARE in current zone
         local tracked = 0
         local skipped = 0
         local numQuestLogEntries = C_QuestLog.GetNumQuestLogEntries()
         DebugPrint("=== STEP 2: Scanning " .. numQuestLogEntries .. " quest log entries for current zone quests ===")
-        
+
         for i = 1, numQuestLogEntries do
             local info = C_QuestLog.GetInfo(i)
             if info and not info.isHeader and not info.isHidden then
                 local questID = info.questID
                 if questID then
                     DebugPrint("Checking quest log entry " .. i .. ": questID=" .. questID .. ", title='" .. (info.title or "unknown") .. "'")
-                    
+
                     -- Check if quest is already tracked
                     local alreadyTracked = false
                     for j = 1, C_QuestLog.GetNumQuestWatches() do
@@ -636,7 +636,7 @@ local function FilterQuestsByZone()
                             break
                         end
                     end
-                    
+
                     if alreadyTracked then
                         DebugPrint("  Quest " .. questID .. " already tracked, skipping")
                         skipped = skipped + 1
@@ -657,7 +657,7 @@ local function FilterQuestsByZone()
                 end
             end
         end
-        
+
         DebugPrint("=== Step 2 complete: newly tracked " .. tracked .. ", skipped (already tracked) " .. skipped .. " ===")
         DebugPrint("=== FINAL: kept " .. kept .. ", untracked " .. untracked .. ", newly tracked " .. tracked .. " quests ===")
     end)
@@ -665,14 +665,14 @@ end
 
 local function OnZoneChanged()
     local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or QuestLogCollapseDB
-    
+
     -- Set flag for zone filtering - will be triggered by user action (map open, movement, etc.)
     -- We can't call FilterQuestsByZone() directly here because it would cause taint
     if profile and profile.filterQuestsByZone then
         needsZoneFilter = true
         DebugPrint("Zone changed - zone filter will run on next user action (open map, move, or use /qlc filterzone)")
     end
-    
+
     if not profile or not profile.enabled then
         DebugPrint("Addon disabled or no profile found (skipping collapse/expand)")
         return
@@ -682,7 +682,7 @@ local function OnZoneChanged()
 
     -- Set a flag to indicate map system might be busy
     mapSystemBusy = true
-    
+
     -- Reset the flag after a MUCH longer delay to be extra safe
     -- The quest data provider needs 30+ seconds to fully initialize after zone change
     C_Timer.After(30.0, function()
@@ -716,7 +716,7 @@ local function OnZoneChanged()
             DebugPrint("Skipping zone change handling - in combat")
             return
         end
-        
+
         -- Additional check to avoid interference during map operations
         if mapSystemBusy then
             DebugPrint("Map system may be busy, deferring tracker operations")
@@ -736,7 +736,7 @@ local function OnZoneChanged()
             end)
             return
         end
-        
+
         local inInstance, instanceType = IsInInstance()
         DebugPrint("Instance check: inInstance=" .. tostring(inInstance) .. ", type=" .. tostring(instanceType))
 
@@ -785,7 +785,7 @@ local function OnCombatStateChanged(event)
         DebugPrint("Addon disabled or no profile found")
         return
     end
-    
+
     -- Make sure we're not in a dungeon to avoid conflicts
     if not IsInDungeon() then
         if event == "PLAYER_REGEN_DISABLED" then
@@ -798,7 +798,7 @@ local function OnCombatStateChanged(event)
                 -- combat, so this direct path is the only one that can take effect
                 -- before InCombatLockdown blocks further frame manipulation.
                 local collapsed = 0
-                
+
                 -- Attempt immediate collapse of each enabled tracker
                 -- Trackers in TAINT_BLACKLIST are skipped here too, mirroring SafeCollapseTracker.
                 -- Without this gate, the immediate path bypasses the blacklist on collapse while
@@ -831,7 +831,7 @@ local function OnCombatStateChanged(event)
                         end
                     end
                 end
-                
+
                 if collapsed > 0 then
                     DebugPrint("Successfully collapsed " .. collapsed .. " trackers immediately in combat")
                     -- Mark that we successfully collapsed and need to expand on combat end
@@ -857,7 +857,7 @@ local function OnCombatStateChanged(event)
             end
         elseif event == "PLAYER_REGEN_ENABLED" then
             DebugPrint("Leaving combat - checking queued operations and quest log state")
-            
+
             if combatStateQueue.enteredCombatOutsideInstance and combatStateQueue.shouldCollapseOnCombatEnd then
                 DebugPrint("Applying queued collapse operation after combat")
                 CollapseQuestLog()
@@ -880,11 +880,11 @@ local function OnCombatStateChanged(event)
             elseif combatStateQueue.enteredCombatOutsideInstance then
                 DebugPrint("Combat ended outside instance but no trackers were collapsed - no expansion needed")
             end
-            
+
             -- Reset combat tracking
             combatStateQueue.enteredCombatOutsideInstance = false
             combatStateQueue.trackersWereCollapsedInCombat = false
-            
+
         end
     else
         DebugPrint("In dungeon/instance - skipping combat state change handling")
@@ -937,7 +937,7 @@ local gcFrame = CreateFrame("Frame")
 local lastGCTime = GetTime()
 gcFrame:SetScript("OnUpdate", function()
     local currentTime = GetTime()
-    
+
     -- Run garbage collection every 5 minutes (300 seconds) if not in combat/instance
     if currentTime - lastGCTime > 300 then
         if not InCombatLockdown() and not IsInDungeon() then
@@ -1047,14 +1047,14 @@ function SlashCmdList.QUESTLOGCOLLAPSE(msg)
         print("  Collapse Queued: " .. (combatStateQueue.shouldCollapseOnCombatEnd and "Yes" or "No"))
         print("  Expand Queued: " .. (combatStateQueue.shouldExpandOnCombatEnd and "Yes" or "No"))
         print("  Trackers Collapsed in Combat: " .. (combatStateQueue.trackersWereCollapsedInCombat and "Yes" or "No"))
-        
+
         print("|cff00ff00Nameplate Status:|r")
         print("  Addon Controlled: " .. (namePlateState.addonControlled and "Yes" or "No"))
         print("  Original State: " .. tostring(namePlateState.originalShowAll or "None"))
         print("  Current nameplateShowAll: " .. tostring(GetCVar("nameplateShowAll")))
         print("  Current nameplateShowEnemies: " .. tostring(GetCVar("nameplateShowEnemies")))
         print("  Current nameplateShowFriends: " .. tostring(GetCVar("nameplateShowFriends")))
-        
+
         print("|cff00ff00Current Section States:|r")
         if QuestObjectiveTracker then
             print("Quests: " .. (QuestObjectiveTracker.collapsed and "Collapsed" or "Expanded"))
