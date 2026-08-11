@@ -1,4 +1,4 @@
-## Interface: 120000, 120001, 120500, 120700, 121000
+## Interface: 120000, 120001, 120500, 120700, 120100
 ## Title: QuestLogCollapse
 ## Notes: Automatically collapses the quest log when entering dungeons
 ## Author: Gaspode
