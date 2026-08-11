@@ -253,6 +253,10 @@ This project is open source. Feel free to modify and distribute as needed.
 
 ## Changelog
 
+### Version 1.4.1
+
+- Updated compatible version
+
 ### Version 1.4.0
 
 - Significant code refactor and optimization for better performance and maintainability
