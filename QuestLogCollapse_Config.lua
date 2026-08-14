@@ -1,7 +1,7 @@
 -- QuestLogCollapse Configuration Panel
 -- Author: Gaspode
 -- Contributors: Artherion77 (significant ui revamp in 1.4.0)
--- Version: 1.4.1
+-- Version: 1.5-beta
 -- Updated: 2024-08-11
 
 
@@ -105,24 +105,44 @@ local defaults = {
     },
 }
 
-local function getDefaultProfile()
-    local t = {}
-    for k, v in pairs(defaults) do
-        if type(v) == "table" then
-            t[k] = {}
-            for k2, v2 in pairs(v) do
-                if type(v2) == "table" then
-                    t[k][k2] = {}
-                    for k3, v3 in pairs(v2) do t[k][k2][k3] = v3 end
-                else
-                    t[k][k2] = v2
-                end
-            end
-        else
-            t[k] = v
+local function DeepCopy(source)
+    if type(source) ~= "table" then
+        return source
+    end
+    local copy = {}
+    for k, v in pairs(source) do
+        copy[k] = DeepCopy(v)
+    end
+    return copy
+end
+
+local function MergeMissingDefaults(target, source)
+    for k, v in pairs(source) do
+        if target[k] == nil then
+            target[k] = DeepCopy(v)
+        elseif type(v) == "table" and type(target[k]) == "table" then
+            MergeMissingDefaults(target[k], v)
         end
     end
-    return t
+end
+
+local function getDefaultProfile()
+    return DeepCopy(defaults)
+end
+
+local LEGACY_DEFAULTS = {
+    enabled = defaults.enabled,
+    debug = defaults.debug,
+    filterQuestsByZone = defaults.filterQuestsByZone,
+    filterQuestsByZoneMode = defaults.filterQuestsByZoneMode,
+}
+
+local function EnsureProfileDefaults(profile)
+    if type(profile) ~= "table" then
+        return getDefaultProfile()
+    end
+    MergeMissingDefaults(profile, defaults)
+    return profile
 end
 
 local function InitializeConfigDB()
@@ -137,12 +157,17 @@ local function InitializeConfigDB()
     if not QuestLogCollapseDB.profiles[QuestLogCollapseCharDB.currentProfile] then
         QuestLogCollapseDB.profiles[QuestLogCollapseCharDB.currentProfile] = getDefaultProfile()
     end
+
     -- Migrate old flat settings into the profile system
-    for k, v in pairs(defaults) do
-        if QuestLogCollapseDB[k] ~= nil and (not QuestLogCollapseDB.profiles["Default"][k]) then
+    for k in pairs(defaults) do
+        if QuestLogCollapseDB[k] ~= nil and QuestLogCollapseDB.profiles["Default"][k] == nil then
             QuestLogCollapseDB.profiles["Default"][k] = QuestLogCollapseDB[k]
             QuestLogCollapseDB[k] = nil
         end
+    end
+
+    for _, profile in pairs(QuestLogCollapseDB.profiles) do
+        EnsureProfileDefaults(profile)
     end
 end
 
@@ -151,7 +176,12 @@ local function getProfile()
        or not QuestLogCollapseCharDB or not QuestLogCollapseCharDB.currentProfile then
         return getDefaultProfile()
     end
-    return QuestLogCollapseDB.profiles[QuestLogCollapseCharDB.currentProfile] or getDefaultProfile()
+    local profile = QuestLogCollapseDB.profiles[QuestLogCollapseCharDB.currentProfile]
+    if not profile then
+        profile = getDefaultProfile()
+        QuestLogCollapseDB.profiles[QuestLogCollapseCharDB.currentProfile] = profile
+    end
+    return EnsureProfileDefaults(profile)
 end
 
 -- ============================================================
@@ -778,3 +808,4 @@ ns.CreateQuestLogCollapseConfigPanel = CreateBasicOptionsPanel
 ns.GetCurrentInstanceSettings        = GetCurrentInstanceSettings
 ns.GetCurrentQLCProfile              = GetCurrentQLCProfile
 ns.SwitchProfile                     = SwitchProfile
+ns.GetLegacyDefaults                 = function() return DeepCopy(LEGACY_DEFAULTS) end

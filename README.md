@@ -2,7 +2,7 @@
 
 A World of Warcraft addon that automatically collapses the quest log when entering dungeons, raids, or combat situations.
 Optionally can filter quests to current zone (triggered by user actions to avoid taint).
-**Please Note: This addon does not work with client versions < 10.0**
+**Please Note: This addon targets current Retail builds (Interface 120000/120001/120500/120700).**
 
 ## Features
 
@@ -40,6 +40,7 @@ The addon provides several slash commands for basic control:
 - `/qlc collapse` - Manually collapse configured sections (queued during combat)
 - `/qlc expand` - Manually expand configured sections (cancels combat queue)
 - `/qlc filterzone` - Manually filter quests by current zone (if enabled in settings)
+- `/qlc diag` - Show concise diagnostics (profile, context, queue, blacklist, trigger source)
 - `/qlc test` - Test objective tracker detection and combat queue status
 - `/qlc testcombat` - Test combat settings and tracker availability
 - `/qlc help` - Show all available commands
@@ -176,7 +177,7 @@ To avoid taint issues with protected quest tracking functions, zone filtering is
 
 ## Compatibility
 
-- **WoW Version**: Compatible with retail World of Warcraft (Interface 110002+)
+- **WoW Version**: Compatible with retail World of Warcraft (Interface 120000, 120001, 120500, 120700)
 - **Dependencies**: None - this is a standalone addon
 - **Conflicts**: Should not conflict with other quest log or UI addons
 
