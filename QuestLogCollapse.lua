@@ -1,8 +1,8 @@
 -- QuestLogCollapse: Automatically collapses quest log when entering dungeons
 -- Author: Gaspode
 -- Contributors: Artherion77
--- Version: 1.4.1
--- Updated: 2024-08-11
+-- Version: 1.5-beta
+-- Updated: 2024-08-13
 
 -- TAINT PROTECTION STRATEGY:
 -- Implemented namespace to avoid global variable pollution
@@ -24,15 +24,7 @@ QuestLogCollapse:RegisterEvent("PLAYER_STARTED_MOVING")
 QuestLogCollapse:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
 QuestLogCollapse:RegisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
 
--- Trackers that must never be collapsed from addon Lua code.
--- SetCollapsed() on any tracker that contains UIWidget-based content (status bars,
--- capsules) causes UIWidgetManager:ProcessWidget → InitPartitions to run in a tainted
--- execution context, which permanently taints the pooled StatusBar frame widths.
--- Those poisoned widths then surface as "secret number" errors in LayoutFrame.lua
--- and Blizzard_UIWidgetTemplateBase.lua whenever the GameTooltip or WorldMap later
--- tries to lay out widget sets.  The pool frames are never size-reset on release,
--- so the taint persists until /reload.
---
+
 -- Keys here are the 'name' strings passed to SafeCollapseTracker/SafeExpandTracker.
 -- Dynamic per-session additions are also written here when a pcall catches a taint error.
 local TAINT_BLACKLIST = {
