@@ -1,17 +1,16 @@
 -- QuestLogCollapse: Automatically collapses quest log when entering dungeons
 -- Author: Gaspode
 -- Contributors: Artherion77
--- Version: 1.5-beta
--- Updated: 2024-08-13
+-- Version: 1.5.1.1-beta
+-- Updated: 2024-08-15
 
 -- TAINT PROTECTION STRATEGY:
 -- Implemented namespace to avoid global variable pollution
 -- Added extensive error handling and logging to detect and isolate taint issues
--- If this resolves taint issues, will remove previous mitigation strategies (disabling collapsing of certain trackers) in future updates
 
 -- Use addon namespace to prevent global variable pollution and taint
 local addonName, ns = ...
-local ADDON_VERSION = "1.4.0"
+local ADDON_VERSION = "1.5.1.1-beta"
 
 -- Create addon frame (local to prevent global pollution)
 local QuestLogCollapse = CreateFrame("Frame")
@@ -26,14 +25,17 @@ QuestLogCollapse:RegisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
 
 
 -- Keys here are the 'name' strings passed to SafeCollapseTracker/SafeExpandTracker.
--- Dynamic per-session additions are also written here when a pcall catches a taint error.
 local TAINT_BLACKLIST = {
-    ["UI widgets"]          = true,  -- UIWidgetObjectiveTracker: directly manages widget pool frames
-    ["Monthly activities"]  = false,  -- MonthlyActivitiesObjectiveTracker: UIWidget status bars for seasonal/event progress
-    ["Adventure map"]      = false,  -- AdventureMapQuestObjectiveTracker: causes world map taint (collapseAdventureMaps defaults false; safety net for users who enable it)
-    ["World quest"]        = false,  -- WorldQuestObjectiveTracker: causes map system taint (collapseWorldQuests defaults false; safety net for users who enable it)
-    ["Bonus objectives"]   = false,  -- BonusObjectiveTracker: SetCollapsed taints UIWidget pool frame widths → LayoutFrame:491 "secret number" on Area POI tooltips
-    ["Quest"]              = false,  -- QuestObjectiveTracker: SetCollapsed taints widget pool frame dimensions when the tracker holds quests with embedded reward / UIWidget content (delve coffer-key timers, world quest reward icons). Confirmed reproducer: tracked World Quest in the log → hover any World Quest pin on the world map → 38× "attempt to perform arithmetic on a secret number value" at Blizzard_GameTooltip/Mainline/GameTooltip.lua:754 (EmbeddedItemTooltip_UpdateSize). Also surfaces at LayoutFrame:491 / UIWidgetTemplateTextWithState:35 in Area POI tooltips.
+    ["UI widgets"]          = false,
+    ["Monthly activities"]  = false,
+    ["Adventure map"]      = false,
+    ["World quest"]        = false,
+    ["Bonus objectives"]   = false,
+    ["Quest"]              = false,
+    ["Achievement"]        = false,
+    ["Scenario"]           = false,
+    ["Campaign"]           = false,
+    ["Professions"]        = false,
 }
 
 -- Helper function to check if a value is tainted
@@ -129,13 +131,9 @@ local function MarkZoneFilterTrigger(reason)
     lastZoneFilterTrigger = reason or "unknown"
 end
 
--- "Have we installed the HookScript already?" guards. Kept as file-locals rather
--- than as fields on the Blizzard frames themselves: writing a custom key onto a
--- Blizzard frame from addon-tainted code marks the frame's table as tainted,
--- which subsequently blocks every protected operation dispatched against it
--- (e.g. ObjectiveTrackerFrame:Show / mixin'd methods on world-map open). See
--- the commit that introduced these for the ADDON_ACTION_BLOCKED Frame:Show
--- repro.
+-- "Have we installed the HookScript already?" guards. Kept as file-locals to avoid tainting
+-- Blizzard frame tables, which would block all protected operations on those frames.
+
 local mapFrameHooked = false
 local minimizeButtonHooked = false
 
@@ -227,7 +225,7 @@ local function SafeCollapseTracker(tracker, name, shouldCollapse)
                 return
             end
 
-            local ok, err = pcall(function()
+            local ok = securecall(function()
                 if tracker and tracker.SetCollapsed then
                     tracker:SetCollapsed(true)
                 end
@@ -237,20 +235,8 @@ local function SafeCollapseTracker(tracker, name, shouldCollapse)
                 DebugPrint(name .. " section collapsed successfully")
                 success = true
             else
-                -- Taint error - log but don't propagate
-                if string.find(err or "", "taint") then
-                    DebugPrint("Warning: Taint detected when collapsing " .. name .. ": " .. tostring(err))
-                    -- Add to taint blacklist for this session
-                    TAINT_BLACKLIST[name] = true
-                else
-                    -- Don't try a `tracker.collapsed = true` direct property write as a
-                    -- fallback — that taints the Blizzard tracker frame just as badly as
-                    -- the SetCollapsed API call (writing arbitrary keys onto a Blizzard
-                    -- frame from addon-tainted code marks the table as tainted, blocking
-                    -- every later protected operation on it). Leave the tracker in
-                    -- whatever state SetCollapsed left it.
-                    DebugPrint("SetCollapsed failed for " .. name .. ": " .. tostring(err) .. " (no fallback — direct property write would taint)")
-                end
+                DebugPrint("Warning: Taint detected when collapsing " .. name .. " (securecall blocked)")
+                TAINT_BLACKLIST[name] = true
             end
         end)
     end
@@ -365,7 +351,7 @@ local function SafeExpandTracker(tracker, name)
                 return
             end
 
-            local ok, err = pcall(function()
+            local ok = securecall(function()
                 if tracker and tracker.SetCollapsed then
                     tracker:SetCollapsed(false)
                 end
@@ -375,17 +361,8 @@ local function SafeExpandTracker(tracker, name)
                 DebugPrint(name .. " section expanded successfully")
                 success = true
             else
-                -- Taint error - log but don't propagate
-                if string.find(err or "", "taint") then
-                    DebugPrint("Warning: Taint detected when expanding " .. name .. ": " .. tostring(err))
-                    -- Add to taint blacklist for this session
-                    TAINT_BLACKLIST[name] = true
-                else
-                    -- Don't try a `tracker.collapsed = false` direct property write as
-                    -- a fallback — same anti-pattern as SafeCollapseTracker's removed
-                    -- Method 2.
-                    DebugPrint("SetCollapsed(false) failed for " .. name .. ": " .. tostring(err) .. " (no fallback — direct property write would taint)")
-                end
+                DebugPrint("Warning: Taint detected when expanding " .. name .. " (securecall blocked)")
+                TAINT_BLACKLIST[name] = true
             end
         end)
     end
@@ -713,9 +690,6 @@ local function OnCombatStateChanged(event)
             if settings and settings.enabled then
                 DebugPrint("PLAYER_REGEN_DISABLED fired - attempting immediate collapse")
 
-                -- Try to collapse immediately. SafeCollapseTracker can't run during
-                -- combat, so this direct path is the only one that can take effect
-                -- before InCombatLockdown blocks further frame manipulation.
                 local collapsed = 0
 
                 -- Attempt immediate collapse of each enabled tracker
@@ -731,7 +705,7 @@ local function OnCombatStateChanged(event)
                         if TAINT_BLACKLIST[name] then
                             DebugPrint("Skipping " .. name .. " immediate collapse - blacklisted (causes UI taint)")
                         else
-                            local ok, err = pcall(function()
+                            local ok = securecall(function()
                                 if tracker.SetCollapsed then
                                     tracker:SetCollapsed(true)
                                     collapsed = collapsed + 1
@@ -740,7 +714,7 @@ local function OnCombatStateChanged(event)
                             if ok then
                                 DebugPrint(name .. " tracker immediately collapsed in combat")
                             else
-                                DebugPrint("Failed to immediately collapse " .. name .. " tracker: " .. tostring(err))
+                                DebugPrint("Failed to immediately collapse " .. name .. " tracker (securecall blocked due to potential taint)")
                             end
                         end
                     end
