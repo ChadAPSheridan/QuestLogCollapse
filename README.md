@@ -254,7 +254,7 @@ This project is open source. Feel free to modify and distribute as needed.
 
 ## Changelog
 
-### Version 1.5.1.1-beta
+### Version 1.5.2
 
 - Use securecall for tracker collapse and expand paths instead of direct calls to protected functions.
 - This should eliminate any remaining taint issues with tracker collapse/expand operations.

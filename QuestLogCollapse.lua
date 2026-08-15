@@ -1,7 +1,7 @@
 -- QuestLogCollapse: Automatically collapses quest log when entering dungeons
 -- Author: Gaspode
 -- Contributors: Artherion77
--- Version: 1.5.1.1-beta
+-- Version: 1.5.2
 -- Updated: 2024-08-15
 
 -- TAINT PROTECTION STRATEGY:
@@ -10,7 +10,7 @@
 
 -- Use addon namespace to prevent global variable pollution and taint
 local addonName, ns = ...
-local ADDON_VERSION = "1.5.1.1-beta"
+local ADDON_VERSION = "1.5.2"
 
 -- Create addon frame (local to prevent global pollution)
 local QuestLogCollapse = CreateFrame("Frame")
@@ -33,7 +33,7 @@ local TAINT_BLACKLIST = {
     ["Bonus objectives"]   = false,
     ["Quest"]              = false,
     ["Achievement"]        = false,
-    ["Scenario"]           = false,
+    ["Scenario"]           = true,
     ["Campaign"]           = false,
     ["Professions"]        = false,
 }
@@ -211,7 +211,30 @@ local function SafeCollapseTracker(tracker, name, shouldCollapse)
         return true
     end
 
-    -- Use secure execution with frame script
+    -- Special handling for Scenario tracker: use C_Timer to avoid taint propagation
+    if name == "Scenario" and tracker.SetCollapsed and type(tracker.SetCollapsed) == "function" then
+        C_Timer.After(0.1, function()
+            if InCombatLockdown() then
+                DebugPrint("Combat started, aborting Scenario collapse")
+                return
+            end
+
+            local ok = securecall(function()
+                if tracker and tracker.SetCollapsed then
+                    tracker:SetCollapsed(true)
+                    DebugPrint("Scenario section collapsed successfully")
+                end
+            end)
+
+            if not ok then
+                DebugPrint("Warning: Taint detected when collapsing Scenario (securecall blocked)")
+                TAINT_BLACKLIST[name] = true
+            end
+        end)
+        return true
+    end
+
+    -- Use secure execution with frame script for other trackers
     local success = false
 
     -- Wrap in error handler to catch and suppress taint errors
