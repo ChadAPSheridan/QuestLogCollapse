@@ -254,6 +254,15 @@ This project is open source. Feel free to modify and distribute as needed.
 
 ## Changelog
 
+### Version 1.5.4
+
+- Fixed World Map visibility monitoring for zone filtering (non-taint approach)
+- Improved debug logging for zone filtering triggers
+
+### Version 1.5.3
+
+- Minor bug fixes and performance improvements
+
 ### Version 1.5.2
 
 - Use securecall for tracker collapse and expand paths instead of direct calls to protected functions.

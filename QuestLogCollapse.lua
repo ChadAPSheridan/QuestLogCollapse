@@ -1,8 +1,8 @@
 -- QuestLogCollapse: Automatically collapses quest log when entering dungeons
 -- Author: Gaspode
 -- Contributors: Artherion77
--- Version: 1.5.2
--- Updated: 2024-08-15
+-- Version: 1.5.4
+-- Updated: 2024-08-16
 
 -- TAINT PROTECTION STRATEGY:
 -- Implemented namespace to avoid global variable pollution
@@ -10,7 +10,7 @@
 
 -- Use addon namespace to prevent global variable pollution and taint
 local addonName, ns = ...
-local ADDON_VERSION = "1.5.2"
+local ADDON_VERSION = "1.5.4"
 
 -- Create addon frame (local to prevent global pollution)
 local QuestLogCollapse = CreateFrame("Frame")
@@ -1140,7 +1140,7 @@ C_Timer.After(2, function()
                 checkTicker:Cancel()
                 return
             end
-            
+
             local isMapShown = WorldMapFrame:IsShown()
             if isMapShown and not lastMapState then
                 DebugPrint("World map opened - checking for pending zone filter")
