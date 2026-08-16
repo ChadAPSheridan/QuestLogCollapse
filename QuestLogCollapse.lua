@@ -1127,31 +1127,30 @@ local function TryRunZoneFilter()
     end
 end
 
--- Hook World Map opening (hardware-initiated: key press or mouse click)
--- The world map can be shown through multiple interfaces in modern WoW
-C_Timer.After(1, function()
-    local function HookWorldMap()
-        if mapFrameHooked then return true end
-        if not WorldMapFrame then return false end
-        WorldMapFrame:HookScript("OnShow", function()
-            DebugPrint("World map opened - checking for pending zone filter")
-            MarkZoneFilterTrigger("World map opened")
-            TryRunZoneFilter()
+-- Monitor World Map opening via periodic visibility check (avoids taint from HookScript)
+-- Instead of hooking into OnShow (which taints the secure frame), we periodically check
+-- if the map is visible and run the filter. This breaks the taint chain from Blizzard's
+-- secure map initialization code.
+C_Timer.After(2, function()
+    if not mapFrameHooked and WorldMapFrame then
+        local lastMapState = false
+        local checkTicker
+        checkTicker = C_Timer.NewTicker(0.5, function()
+            if not WorldMapFrame then
+                checkTicker:Cancel()
+                return
+            end
+            
+            local isMapShown = WorldMapFrame:IsShown()
+            if isMapShown and not lastMapState then
+                DebugPrint("World map opened - checking for pending zone filter")
+                MarkZoneFilterTrigger("World map opened")
+                TryRunZoneFilter()
+            end
+            lastMapState = isMapShown
         end)
         mapFrameHooked = true
-        DebugPrint("Hooked WorldMapFrame for zone filtering")
-        return true
-    end
-
-    if not HookWorldMap() then
-        local attempts = 0
-        local ticker
-        ticker = C_Timer.NewTicker(1, function()
-            attempts = attempts + 1
-            if HookWorldMap() or attempts > 30 then
-                ticker:Cancel()
-            end
-        end)
+        DebugPrint("Monitoring WorldMapFrame visibility for zone filtering (non-taint approach)")
     end
 end)
 
