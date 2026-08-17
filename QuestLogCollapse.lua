@@ -174,13 +174,15 @@ local function IsInDungeon()
 end
 
 -- Safe function to collapse a tracker using secure methods
-local function SafeCollapseTracker(tracker, name, shouldCollapse)
+local function SafeCollapseTracker(tracker, name, shouldCollapse, forceAllowInCombat)
     if not isFullyLoaded or not tracker or not shouldCollapse then
         return false
     end
 
-    -- NEVER manipulate trackers during combat to avoid taint
-    if InCombatLockdown() then
+    -- Allow collapse during combat only if explicitly forced (for dungeon/instance entry)
+    -- or if not in combat. Outside instances, never collapse during combat to avoid taint.
+    local blockDueToCombat = InCombatLockdown() and not forceAllowInCombat
+    if blockDueToCombat then
         DebugPrint("Skipping " .. name .. " collapse - in combat")
         return false
     end
@@ -268,9 +270,10 @@ local function SafeCollapseTracker(tracker, name, shouldCollapse)
 end
 
 local function CollapseQuestLog()
-    -- NEVER do anything during combat to avoid taint
-    if InCombatLockdown() then
-        DebugPrint("CollapseQuestLog() skipped - in combat")
+    -- Allow collapse during combat ONLY in dungeons/instances
+    -- Outside instances, skip during combat to avoid taint
+    if InCombatLockdown() and not IsInDungeon() then
+        DebugPrint("CollapseQuestLog() skipped - in combat outside instance")
         return
     end
 
@@ -290,10 +293,14 @@ local function CollapseQuestLog()
     end
 
     DebugPrint("Instance settings found and enabled, proceeding with collapse")
+    
+    -- When in dungeon during combat, allow collapse immediately
+    local forceAllowInCombat = IsInDungeon() and InCombatLockdown()
+    
     local collapsed = 0
 
     for _, def in ipairs(TRACKER_DEFS) do
-        if SafeCollapseTracker(def.getter(), def.name, settings[def.settingKey]) then
+        if SafeCollapseTracker(def.getter(), def.name, settings[def.settingKey], forceAllowInCombat) then
             collapsed = collapsed + 1
         end
     end
@@ -616,7 +623,7 @@ local function FilterQuestsByZone()
     end)
 end
 
-local function RunWhenAddonReady(label, maxAttempts, intervalSeconds, callback)
+local function RunWhenAddonReady(label, maxAttempts, intervalSeconds, callback, allowDungeonCombat)
     local attempts = 0
     local maxTries = maxAttempts or 20
     local interval = intervalSeconds or 1
@@ -624,7 +631,10 @@ local function RunWhenAddonReady(label, maxAttempts, intervalSeconds, callback)
     local function TryRun()
         attempts = attempts + 1
 
-        if not isFullyLoaded or mapSystemBusy or InCombatLockdown() or not ObjectiveTrackerFrame then
+        -- Allow callbacks during dungeon combat if explicitly permitted (for zone changes in instances)
+        local blockDueToCombat = InCombatLockdown() and not (allowDungeonCombat and IsInDungeon())
+        
+        if not isFullyLoaded or mapSystemBusy or blockDueToCombat or not ObjectiveTrackerFrame then
             if attempts < maxTries then
                 C_Timer.After(interval, TryRun)
             else
@@ -669,7 +679,7 @@ local function OnZoneChanged()
             DebugPrint("Left instance - expanding all collapsed sections")
             ExpandQuestLog()
         end
-    end)
+    end, true)  -- Allow callback during dungeon combat
 end
 
 local function OnAddonLoaded(addonName)
@@ -705,8 +715,10 @@ local function OnCombatStateChanged(event)
         return
     end
 
-    -- Make sure we're not in a dungeon to avoid conflicts
-    if not IsInDungeon() then
+    -- Allow dungeon collapse regardless of combat state - dungeons need to collapse immediately
+    local inDungeon = IsInDungeon()
+
+    if not inDungeon then
         if event == "PLAYER_REGEN_DISABLED" then
             -- Check if combat collapse is enabled
             local settings = ns.GetCurrentInstanceSettings and ns.GetCurrentInstanceSettings()
@@ -798,7 +810,13 @@ local function OnCombatStateChanged(event)
 
         end
     else
-        DebugPrint("In dungeon/instance - skipping combat state change handling")
+        -- In dungeon/instance - allow collapse regardless of combat state
+        if event == "PLAYER_REGEN_DISABLED" then
+            DebugPrint("Entered combat IN DUNGEON - applying immediate collapse")
+            CollapseQuestLog()
+        elseif event == "PLAYER_REGEN_ENABLED" then
+            DebugPrint("Left combat in dungeon - staying collapsed (in instance)")
+        end
     end
 end
 
