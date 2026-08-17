@@ -254,6 +254,12 @@ This project is open source. Feel free to modify and distribute as needed.
 
 ## Changelog
 
+### Verion 1.5.5
+
+- Added `/qlc diag` command for concise diagnostics (profile, context, queue, blacklist, trigger source)
+- Improved debug logging for zone filtering triggers and combat queue operations
+- hopefully fixed remaining taint issues with zone filtering and combat queue operations
+
 ### Version 1.5.4
 
 - Fixed World Map visibility monitoring for zone filtering (non-taint approach)

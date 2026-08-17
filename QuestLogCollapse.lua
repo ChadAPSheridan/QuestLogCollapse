@@ -1,7 +1,7 @@
 -- QuestLogCollapse: Automatically collapses quest log when entering dungeons
 -- Author: Gaspode
 -- Contributors: Artherion77
--- Version: 1.5.4
+-- Version: 1.5.5
 -- Updated: 2024-08-16
 
 -- TAINT PROTECTION STRATEGY:
@@ -10,7 +10,7 @@
 
 -- Use addon namespace to prevent global variable pollution and taint
 local addonName, ns = ...
-local ADDON_VERSION = "1.5.4"
+local ADDON_VERSION = "1.5.5"
 
 -- Create addon frame (local to prevent global pollution)
 local QuestLogCollapse = CreateFrame("Frame")
@@ -293,10 +293,10 @@ local function CollapseQuestLog()
     end
 
     DebugPrint("Instance settings found and enabled, proceeding with collapse")
-    
+
     -- When in dungeon during combat, allow collapse immediately
     local forceAllowInCombat = IsInDungeon() and InCombatLockdown()
-    
+
     local collapsed = 0
 
     for _, def in ipairs(TRACKER_DEFS) do
@@ -633,7 +633,7 @@ local function RunWhenAddonReady(label, maxAttempts, intervalSeconds, callback, 
 
         -- Allow callbacks during dungeon combat if explicitly permitted (for zone changes in instances)
         local blockDueToCombat = InCombatLockdown() and not (allowDungeonCombat and IsInDungeon())
-        
+
         if not isFullyLoaded or mapSystemBusy or blockDueToCombat or not ObjectiveTrackerFrame then
             if attempts < maxTries then
                 C_Timer.After(interval, TryRun)
