@@ -1,8 +1,8 @@
 -- QuestLogCollapse Configuration Panel
 -- Author: Gaspode
 -- Contributors: Artherion77 (significant ui revamp in 1.4.0)
--- Version: 1.5.5
--- Updated: 2024-08-16
+-- Version: 1.5.6
+-- Updated: 2026-08-17
 
 
 local addonName, ns = ...

@@ -1,8 +1,8 @@
 -- QuestLogCollapse: Automatically collapses quest log when entering dungeons
 -- Author: Gaspode
 -- Contributors: Artherion77
--- Version: 1.5.5
--- Updated: 2024-08-16
+-- Version: 1.5.6
+-- Updated: 2026-08-17
 
 -- TAINT PROTECTION STRATEGY:
 -- Implemented namespace to avoid global variable pollution
@@ -10,7 +10,7 @@
 
 -- Use addon namespace to prevent global variable pollution and taint
 local addonName, ns = ...
-local ADDON_VERSION = "1.5.5"
+local ADDON_VERSION = "1.5.6"
 
 -- Create addon frame (local to prevent global pollution)
 local QuestLogCollapse = CreateFrame("Frame")
@@ -26,7 +26,7 @@ QuestLogCollapse:RegisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
 
 -- Keys here are the 'name' strings passed to SafeCollapseTracker/SafeExpandTracker.
 local TAINT_BLACKLIST = {
-    ["UI widgets"]          = false,
+    ["UI widgets"]          = true,  -- Causes taint when collapsing/expanding due to Blizzard's secure widget handling
     ["Monthly activities"]  = false,
     ["Adventure map"]      = false,
     ["World quest"]        = false,

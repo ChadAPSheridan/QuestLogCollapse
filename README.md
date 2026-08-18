@@ -254,6 +254,10 @@ This project is open source. Feel free to modify and distribute as needed.
 
 ## Changelog
 
+### Version 1.5.6
+
+- Reset TAINT_BLACKLIST entry for UI Widgets to default to true to address taint issues that persist.
+
 ### Verion 1.5.5
 
 - Added `/qlc diag` command for concise diagnostics (profile, context, queue, blacklist, trigger source)

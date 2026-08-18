@@ -3,8 +3,8 @@
 ## Notes: Automatically collapses the quest log when entering dungeons
 ## Author: Gaspode
 ## Contributors: Artherion77
-## Version: 1.5.5
-## Updated: 2024-08-16
+## Version: 1.5.6
+## Updated: 2026-08-17
 
 ## SavedVariables: QuestLogCollapseDB
 ## SavedVariablesPerCharacter: QuestLogCollapseCharDB
