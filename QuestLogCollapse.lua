@@ -75,7 +75,14 @@ for _, def in ipairs(TRACKER_DEFS) do
     TRACKER_DEF_BY_NAME[def.name] = def
 end
 
+local function IsScenarioTracker(tracker, name)
+    return name == "Scenario" or tracker == ScenarioObjectiveTracker
+end
+
 local function QueuePendingOperation(trackerName, action)
+    if trackerName == "Scenario" then
+        return
+    end
     pendingOperations[trackerName] = { action = action, trackerName = trackerName }
 end
 
@@ -179,6 +186,11 @@ local function SafeCollapseTracker(tracker, name, shouldCollapse, forceAllowInCo
         return false
     end
 
+    if IsScenarioTracker(tracker, name) then
+        DebugPrint("Skipping Scenario tracker (taint-prone secure path)")
+        return false
+    end
+
     -- Allow collapse during combat only if explicitly forced (for dungeon/instance entry)
     -- or if not in combat. Outside instances, never collapse during combat to avoid taint.
     local blockDueToCombat = InCombatLockdown() and not forceAllowInCombat
@@ -210,29 +222,6 @@ local function SafeCollapseTracker(tracker, name, shouldCollapse, forceAllowInCo
     -- Check if this operation is already pending
     if pendingOperations[name] then
         DebugPrint("Operation already pending for " .. name)
-        return true
-    end
-
-    -- Special handling for Scenario tracker: use C_Timer to avoid taint propagation
-    if name == "Scenario" and tracker.SetCollapsed and type(tracker.SetCollapsed) == "function" then
-        C_Timer.After(0.1, function()
-            if InCombatLockdown() then
-                DebugPrint("Combat started, aborting Scenario collapse")
-                return
-            end
-
-            local ok = securecall(function()
-                if tracker and tracker.SetCollapsed then
-                    tracker:SetCollapsed(true)
-                    DebugPrint("Scenario section collapsed successfully")
-                end
-            end)
-
-            if not ok then
-                DebugPrint("Warning: Taint detected when collapsing Scenario (securecall blocked)")
-                TAINT_BLACKLIST[name] = true
-            end
-        end)
         return true
     end
 
@@ -332,6 +321,11 @@ end
 local function SafeExpandTracker(tracker, name)
     if not isFullyLoaded or not tracker then
         DebugPrint(name .. " not found or not fully loaded")
+        return false
+    end
+
+    if IsScenarioTracker(tracker, name) then
+        DebugPrint("Skipping Scenario tracker (taint-prone secure path)")
         return false
     end
 
