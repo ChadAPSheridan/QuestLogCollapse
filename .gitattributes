@@ -1,0 +1,7 @@
+# Exclude specific files
+.gitignore export-ignore
+.gitattributes export-ignore
+README.md export-ignore
+
+# Exclude entire folders
+tests/ export-ignore
