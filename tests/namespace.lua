@@ -1,7 +1,8 @@
 -- Run from the repository root with: lua5.1 tests/namespace.lua
 local function run(savedDB, savedCharDB)
     local frames, timers, messages = {}, {}, {}
-    local now, inCombat = 0, false
+    local now, inCombat, instanceType = 0, false, "none"
+    local enemyNameplates = "0"
     local allowedGlobals = {
         QuestLogCollapseDB = true,
         QuestLogCollapseCharDB = true,
@@ -75,8 +76,19 @@ local function run(savedDB, savedCharDB)
     globals.UIParent = widget()
     globals.GetTime = function() return now end
     globals.InCombatLockdown = function() return inCombat end
-    globals.IsInInstance = function() return false, "none" end
-    globals.GetCVar = function() return "0" end
+    globals.IsInInstance = function() return instanceType ~= "none", instanceType end
+    globals.Enum = { GarrisonType = { Type_6_0_Garrison = 1, Type_7_0_Garrison = 2, Type_8_0_Garrison = 3 } }
+    globals.C_Garrison = {
+        IsPlayerInGarrison = function() return false end,
+        IsAtGarrisonMissionNPC = function() return false end,
+    }
+    globals.GetCVar = function(name)
+        return name == "nameplateShowEnemies" and enemyNameplates or "0"
+    end
+    globals.SetCVar = function(name, value)
+        assert(name == "nameplateShowEnemies")
+        enemyNameplates = value
+    end
     globals.print = function(message) messages[#messages + 1] = message end
     globals.securecall = function(callback) callback(); return true end
     globals.C_Timer = {
@@ -164,8 +176,28 @@ local function run(savedDB, savedCharDB)
     assert(ns.GetCurrentQLCProfile() == ns.db.profiles.Default)
 
     -- Deferred work must reach the shared processor after map activity ends.
-    local combat = ns.GetCurrentQLCProfile().combat
-    combat.enabled, combat.collapseQuests = true, true
+    local defaultSettings = ns.GetCurrentQLCProfile().defaultSettings
+    assert(ns.GetCurrentInstanceSettings() == defaultSettings, "Open-world context did not use default settings")
+    defaultSettings.enabled, defaultSettings.collapseQuests = true, true
+    defaultSettings.namePlates.enabled = true
+    ns.UpdateNamePlates()
+    assert(enemyNameplates == "1", "Default settings did not enable enemy nameplates")
+    local dungeonSettings = ns.GetCurrentQLCProfile().dungeons
+    dungeonSettings.enabled = false
+    instanceType = "party"
+    assert(ns.GetCurrentInstanceSettings() == defaultSettings, "Disabled instance settings did not fall back to defaults")
+    dungeonSettings.enabled = true
+    assert(ns.GetCurrentInstanceSettings() == dungeonSettings, "Enabled instance settings were not selected")
+    dungeonSettings.namePlates.enabled = false
+    ns.UpdateNamePlates()
+    assert(enemyNameplates == "0", "Zone settings did not restore the original nameplate state")
+    dungeonSettings.namePlates.enabled = true
+    ns.UpdateNamePlates()
+    assert(enemyNameplates == "1", "Instance settings did not enable enemy nameplates")
+    instanceType = "none"
+    defaultSettings.namePlates.enabled = false
+    ns.UpdateNamePlates()
+    assert(enemyNameplates == "0", "Default settings did not restore the original nameplate state")
     ns.HandleSlashCommand("collapse")
     assert(globals.QuestObjectiveTracker.collapsed == nil)
     now = 16
@@ -189,10 +221,17 @@ local function run(savedDB, savedCharDB)
 end
 
 run()
-local profile = { enabled = false, debug = false, dungeons = { collapseCampaigns = false } }
+local profile = {
+    enabled = false,
+    debug = false,
+    combat = { enabled = true, collapseQuests = true },
+    dungeons = { collapseCampaigns = false },
+}
 local db = { profiles = { Default = {}, Existing = profile } }
 local charDB = { currentProfile = "Existing" }
 run(db, charDB)
 assert(db.profiles.Existing == profile)
 assert(profile.enabled == false and profile.dungeons.collapseCampaigns == false)
+assert(profile.combat == nil, "Legacy combat settings were not migrated")
+assert(profile.defaultSettings.enabled == true and profile.defaultSettings.collapseQuests == true)
 print("Namespace isolation and addon lifecycle checks passed")

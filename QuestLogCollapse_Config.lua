@@ -15,7 +15,7 @@ local defaults = {
     debug = false,
     filterQuestsByZone = false,
     filterQuestsByZoneMode = "openworld",  -- "openworld" | "always"
-    combat = {
+    defaultSettings = {
         enabled = false,
         collapseQuests = false, collapseAchievements = false,
         collapseBonusObjectives = false, collapseScenarios = false, collapseCampaigns = false,
@@ -160,6 +160,14 @@ local function InitializeConfigDB()
     end
     if not ns.db.profiles[ns.charDB.currentProfile] then
         ns.db.profiles[ns.charDB.currentProfile] = getDefaultProfile()
+    end
+
+    -- Preserve the former Open World Combat settings as the profile defaults.
+    for _, profile in pairs(ns.db.profiles) do
+        if profile.defaultSettings == nil and type(profile.combat) == "table" then
+            profile.defaultSettings = profile.combat
+        end
+        profile.combat = nil
     end
 
     -- Migrate old flat settings into the profile system
@@ -320,7 +328,9 @@ local function BuildContainer(parent, instanceInfo, yTopLeft, isLegacy)
     typeEnabledCheck.key = instanceInfo.key
     Tip(typeEnabledCheck, "Activate for " .. instanceInfo.name,
         instanceInfo.contextTip or ("Apply these settings when you enter " .. instanceInfo.name .. "."),
-        "When unchecked, the addon will not collapse or expand any trackers in this context.")
+        instanceInfo.key == "defaultSettings"
+            and "When unchecked, default settings will not perform tracker changes."
+            or "When unchecked, Default Settings are used in this context.")
     typeEnabledCheck:SetScript("OnClick", function(self)
         getProfile()[self.key].enabled = self:GetChecked()
     end)
@@ -372,8 +382,10 @@ local function BuildContainer(parent, instanceInfo, yTopLeft, isLegacy)
     namePlatesCheck.Text:SetText("Show Enemy Name Plates")
     namePlatesCheck.key = instanceInfo.key
     Tip(namePlatesCheck, "Show Enemy Name Plates",
-        "Automatically enable enemy nameplates when entering " .. instanceInfo.name .. ".",
-        "Your original nameplate setting is restored when you leave.",
+        instanceInfo.key == "defaultSettings"
+            and "Enable enemy nameplates when default settings are used."
+            or "Automatically enable enemy nameplates when entering " .. instanceInfo.name .. ".",
+        "Your original setting is restored when the current zone type does not request nameplates.",
         "Controls the |cffffcc00nameplateShowEnemies|r game CVar.")
     namePlatesCheck:SetScript("OnClick", function(self)
         local prof = getProfile()
@@ -389,9 +401,9 @@ end
 -- ============================================================
 -- INSTANCE TYPE DEFINITIONS
 -- ============================================================
-local combatType = {
-    { key = "combat", name = "Open World Combat", color = "|cffffff00",
-      contextTip = "Applied when you enter combat outside of any instance." },
+local defaultSettingsType = {
+    { key = "defaultSettings", name = "Default Settings", color = "|cffffff00",
+      contextTip = "Used when no instance-specific settings apply. These settings do not trigger any actions during combat." },
 }
 local instanceTypes = {
     { key = "dungeons",  name = "Dungeons",  color = "|cff00ff00",
@@ -472,7 +484,7 @@ local function BuildContainerPanel(titleText, typeList, isLegacyStyle)
 end
 
 -- ============================================================
--- BASIC OPTIONS PANEL  (parent category — global settings + open world combat)
+-- BASIC OPTIONS PANEL  (parent category — global settings + default settings)
 -- ============================================================
 local basicPanel  -- forward ref for SwitchProfile below
 
@@ -636,20 +648,20 @@ local function CreateBasicOptionsPanel()
     InitFilterModeDD()
 
     -- --------------------------------------------------------
-    -- OPEN WORLD COMBAT SECTION
+    -- DEFAULT SETTINGS SECTION
     -- --------------------------------------------------------
     local sep2 = scrollChild:CreateTexture(nil, "BACKGROUND")
     sep2:SetPoint("TOPLEFT", filterQuestsByZoneCheck, "BOTTOMLEFT", 4, -10)
     sep2:SetSize(590, 1)
     sep2:SetColorTexture(0.5, 0.5, 0.5, 0.4)
 
-    local owcHeader = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    owcHeader:SetPoint("TOPLEFT", sep2, "BOTTOMLEFT", 0, -8)
-    owcHeader:SetText("OPEN WORLD COMBAT")
-    owcHeader:SetTextColor(0.6, 0.6, 0.6)
+    local defaultSettingsHeader = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    defaultSettingsHeader:SetPoint("TOPLEFT", sep2, "BOTTOMLEFT", 0, -8)
+    defaultSettingsHeader:SetText("DEFAULT SETTINGS")
+    defaultSettingsHeader:SetTextColor(0.6, 0.6, 0.6)
 
-    -- yTopLeft computed from: profile(~26) + sep1(1) + enable(26) + zfHeader(14) + filter(26) + sep2(1) + gap(8) + owcHeader(14) + gap(6) ≈ 163
-    local combatContainer = BuildContainer(scrollChild, combatType[1], -163, false)
+    -- yTopLeft computed from: profile(~26) + sep1(1) + enable(26) + zfHeader(14) + filter(26) + sep2(1) + gap(8) + header(14) + gap(6) ≈ 163
+    local defaultSettingsContainer = BuildContainer(scrollChild, defaultSettingsType[1], -163, false)
     scrollChild:SetHeight(163 + CONTAINER_H + 20)
 
     -- --------------------------------------------------------
@@ -691,7 +703,7 @@ local function CreateBasicOptionsPanel()
         filterQuestsByZoneCheck:SetChecked(prof.filterQuestsByZone or false)
         UIDropDownMenu_SetSelectedValue(filterModeDD, prof.filterQuestsByZoneMode or "openworld")
 
-        RefreshContainer(combatContainer, "combat", prof)
+        RefreshContainer(defaultSettingsContainer, "defaultSettings", prof)
         RefreshQLCProfileDropdown()
         InitFilterModeDD()
     end
@@ -782,24 +794,29 @@ local function GetCurrentInstanceSettings()
     if ns.DebugPrint then
         ns.DebugPrint("Current instance type: " .. tostring(instanceType))
     end
+    local settings
     if instanceType == "party" then
         local isInGarrison  = C_Garrison.IsPlayerInGarrison(Enum.GarrisonType.Type_6_0_Garrison)
         local isInClassHall = C_Garrison.IsPlayerInGarrison(Enum.GarrisonType.Type_7_0_Garrison)
         local isAtQuestTable = C_Garrison.IsAtGarrisonMissionNPC() or
                                C_Garrison.IsPlayerInGarrison(Enum.GarrisonType.Type_8_0_Garrison)
-        if isInGarrison      then return prof.garrisons
-        elseif isInClassHall then return prof.classHalls
-        elseif isAtQuestTable then return prof.questTables
-        else                      return prof.dungeons
+        if isInGarrison      then settings = prof.garrisons
+        elseif isInClassHall then settings = prof.classHalls
+        elseif isAtQuestTable then settings = prof.questTables
+        else                      settings = prof.dungeons
         end
-    elseif instanceType == "raid"         then return prof.raids
-    elseif instanceType == "scenario"     then return prof.scenarios
-    elseif instanceType == "pvp"          then return prof.battlegrounds
-    elseif instanceType == "arena"        then return prof.arenas
-    elseif instanceType == "neighborhood" then return prof.neighbourhood
-    elseif instanceType == "interior"     then return prof.house
-    else                                       return prof.combat
+    elseif instanceType == "raid"         then settings = prof.raids
+    elseif instanceType == "scenario"     then settings = prof.scenarios
+    elseif instanceType == "pvp"          then settings = prof.battlegrounds
+    elseif instanceType == "arena"        then settings = prof.arenas
+    elseif instanceType == "neighborhood" then settings = prof.neighbourhood
+    elseif instanceType == "interior"     then settings = prof.house
     end
+
+    if settings and settings.enabled then
+        return settings
+    end
+    return prof.defaultSettings
 end
 
 local function GetCurrentQLCProfile()

@@ -16,7 +16,7 @@ local ADDON_VERSION = "1.5.9"
 local QuestLogCollapse = CreateFrame("Frame")
 QuestLogCollapse:RegisterEvent("ADDON_LOADED")
 QuestLogCollapse:RegisterEvent("ZONE_CHANGED_NEW_AREA")
--- QuestLogCollapse:RegisterEvent("PLAYER_REGEN_DISABLED") -- removed as we are now handling combat state in a more robust way
+-- Combat start is intentionally not handled; combat does not trigger automatic tracker changes.
 QuestLogCollapse:RegisterEvent("PLAYER_REGEN_ENABLED")
 QuestLogCollapse:RegisterEvent("PLAYER_ENTERING_WORLD")
 QuestLogCollapse:RegisterEvent("PLAYER_STARTED_MOVING")
@@ -155,6 +155,37 @@ local function IsInDungeon()
         instanceType == "arena" or instanceType == "neighborhood" or instanceType == "interior"
 end
 
+local function UpdateNamePlates()
+    if InCombatLockdown() then
+        DebugPrint("Skipping nameplate update - in combat")
+        return
+    end
+
+    local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or ns.db
+    local settings = ns.GetCurrentInstanceSettings and ns.GetCurrentInstanceSettings()
+    local shouldShow = profile and profile.enabled and settings and settings.enabled
+        and settings.namePlates and settings.namePlates.enabled
+
+    if shouldShow then
+        if not namePlateState.addonControlled then
+            namePlateState.originalShowAll = GetCVar("nameplateShowEnemies")
+            namePlateState.addonControlled = true
+            DebugPrint("Stored original ENEMY nameplate state: " .. tostring(namePlateState.originalShowAll))
+        end
+        if GetCVar("nameplateShowEnemies") ~= "1" then
+            SetCVar("nameplateShowEnemies", "1")
+        end
+        DebugPrint("Enabled ENEMY nameplates for current zone settings")
+    elseif namePlateState.addonControlled then
+        local originalState = namePlateState.originalShowAll or "0"
+        SetCVar("nameplateShowEnemies", originalState)
+        DebugPrint("Restored original ENEMY nameplate state: " .. tostring(originalState))
+        namePlateState.addonControlled = false
+        namePlateState.originalShowAll = nil
+    end
+end
+ns.UpdateNamePlates = UpdateNamePlates
+
 -- Safe function to collapse a tracker
 local function SafeCollapseTracker(tracker, name, shouldCollapse)
     if not isFullyLoaded or not tracker or not shouldCollapse then
@@ -230,26 +261,6 @@ local function CollapseQuestLog()
     end
 
     DebugPrint("Collapsed " .. collapsed .. " sections")
-
-    -- Handle nameplate settings (only if not in combat)
-    if settings.namePlates and settings.namePlates.enabled and not InCombatLockdown() then
-        DebugPrint("Enabling ENEMY nameplates for instance")
-        -- Store original state before changing it (only if we haven't already)
-        if not namePlateState.addonControlled then
-            namePlateState.originalShowAll = GetCVar("nameplateShowEnemies")
-            DebugPrint("Stored original ENEMY nameplate state: " .. tostring(namePlateState.originalShowAll))
-            -- Debug: Show current state of all nameplate CVars
-            DebugPrint("Before change - nameplateShowAll: " .. tostring(GetCVar("nameplateShowAll")))
-            DebugPrint("Before change - nameplateShowEnemies: " .. tostring(GetCVar("nameplateShowEnemies")))
-            DebugPrint("Before change - nameplateShowFriends: " .. tostring(GetCVar("nameplateShowFriends")))
-        end
-        namePlateState.addonControlled = true
-        SetCVar("nameplateShowEnemies", "1")
-        -- Debug: Show state after change
-        DebugPrint("After change - nameplateShowAll: " .. tostring(GetCVar("nameplateShowAll")))
-        DebugPrint("After change - nameplateShowEnemies: " .. tostring(GetCVar("nameplateShowEnemies")))
-        DebugPrint("After change - nameplateShowFriends: " .. tostring(GetCVar("nameplateShowFriends")))
-    end
 end
 
 -- Safe function to expand a tracker
@@ -331,27 +342,8 @@ local function ExpandQuestLog()
             expanded = expanded + 1
         end
     end
-
     DebugPrint("Expanded " .. expanded .. " sections/modules")
-
-    -- Restore nameplate settings (only if the addon was controlling them)
-    if namePlateState.addonControlled and not InCombatLockdown() then
-        DebugPrint("Restoring original ENEMY nameplate state: " .. tostring(namePlateState.originalShowAll))
-        -- Debug: Show current state before restoration
-        DebugPrint("Before restore - nameplateShowAll: " .. tostring(GetCVar("nameplateShowAll")))
-        DebugPrint("Before restore - nameplateShowEnemies: " .. tostring(GetCVar("nameplateShowEnemies")))
-        DebugPrint("Before restore - nameplateShowFriends: " .. tostring(GetCVar("nameplateShowFriends")))
-
-        SetCVar("nameplateShowEnemies", namePlateState.originalShowAll or "0")
-
-        -- Debug: Show state after restoration
-        DebugPrint("After restore - nameplateShowAll: " .. tostring(GetCVar("nameplateShowAll")))
-        DebugPrint("After restore - nameplateShowEnemies: " .. tostring(GetCVar("nameplateShowEnemies")))
-        DebugPrint("After restore - nameplateShowFriends: " .. tostring(GetCVar("nameplateShowFriends")))
-
-        namePlateState.addonControlled = false
-        namePlateState.originalShowAll = nil
-    end
+    DebugPrint("Expanded " .. expanded .. " sections/modules")
 end
 
 -- Filter quests by current zone
@@ -549,6 +541,8 @@ end
 local function OnZoneChanged()
     local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or ns.db
 
+    UpdateNamePlates()
+
     -- Set flag for zone filtering - will be triggered by user action (map open, movement, etc.)
     -- We can't call FilterQuestsByZone() directly here because it would cause taint
     if profile and profile.filterQuestsByZone then
@@ -598,6 +592,7 @@ local function OnAddonLoaded(loadedAddonName)
     "|cffff9900[QuestLogCollapse]|r Note: Some trackers (Quests, Bonus Objectives, World Quests) are disabled by default to prevent UI taint. Enable at your own risk.")
 
     RunWhenAddonReady("Initial state check", 40, 1, function()
+        UpdateNamePlates()
         if IsInDungeon() then
             local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or ns.db
             if profile and profile.enabled and not InCombatLockdown() then
@@ -655,6 +650,7 @@ QuestLogCollapse:SetScript("OnEvent", function(self, event, ...)
     elseif event == "PLAYER_REGEN_ENABLED" then
         -- Handle combat options
         OnCombatStateChanged(event)
+        UpdateNamePlates()
     elseif event == "PLAYER_STARTED_MOVING" then
         -- Player movement - check for pending zone filter
         -- This is typically hardware-initiated (WASD keys)
@@ -715,15 +711,13 @@ function ns.HandleSlashCommand(msg)
         print("|cffff0000/qlc filterzone|r - Filter quests by current zone (manual)")
         print("|cffff0000/qlc diag|r - Show concise diagnostic summary")
         print("|cffff0000/qlc test|r - Test objective tracker detection")
-        print("|cffff0000/qlc testcombat|r - Test combat collapse behavior")
+        print("|cffff0000/qlc testcombat|r - Test current settings (legacy command name)")
         print("|cffff0000/qlc clearpending|r - Clear pending tracker operations")
         print("|cffff0000/qlc config|r - Open configuration panel")
         print("")
-        print("|cff00ff00Combat Behavior:|r")
-        print("• Quest trackers collapse on PLAYER_REGEN_DISABLED (combat start)")
-        print("• Trackers in the runtime taint blacklist are skipped")
-        print("• Quest trackers automatically expand when combat ends (outside instances)")
-        print("• If immediate collapse fails, operations are queued for when combat ends")
+        print("|cff00ff00Combat Safety:|r")
+        print("• Automatic tracker changes are not triggered by combat")
+        print("• Manual tracker operations requested during combat are deferred until combat ends")
         print("• Use |cffff0000/qlc expand|r during combat to cancel queued operations")
         print("")
         print("|cff00ff00Zone Filtering:|r")
@@ -902,12 +896,12 @@ function ns.HandleSlashCommand(msg)
         print("  Expand Queued: " .. (combatStateQueue.shouldExpandOnCombatEnd and "Yes" or "No"))
         print("  Trackers Collapsed in Combat: " .. (combatStateQueue.trackersWereCollapsedInCombat and "Yes" or "No"))
     elseif args[1] == "testcombat" then
-        print("|cff00ff00QuestLogCollapse Combat Test:|r")
+        print("|cff00ff00QuestLogCollapse Current Settings Test:|r")
         local settings = ns.GetCurrentInstanceSettings and ns.GetCurrentInstanceSettings()
         if settings then
-            print("Combat Settings Found: " .. (settings.enabled and "Enabled" or "Disabled"))
+            print("Current Settings Found: " .. (settings.enabled and "Enabled" or "Disabled"))
             if settings.enabled then
-                print("Combat Collapse Sections:")
+                print("Configured Collapse Sections:")
                 print("  Quests: " .. (settings.collapseQuests and "Yes" or "No"))
                 print("  Achievements: " .. (settings.collapseAchievements and "Yes" or "No"))
                 print("  Bonus Objectives: " .. (settings.collapseBonusObjectives and "Yes" or "No"))
@@ -921,7 +915,7 @@ function ns.HandleSlashCommand(msg)
                 print("  Nameplate Control: " .. (settings.namePlates and settings.namePlates.enabled and "Yes" or "No"))
             end
         else
-            print("No combat settings found")
+            print("No settings found")
         end
         print("Current Combat State: " .. (InCombatLockdown() and "In Combat" or "Not in Combat"))
         print("Current Instance State: " .. (IsInDungeon() and "In Instance" or "Outside Instance"))
