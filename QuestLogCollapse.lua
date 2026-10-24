@@ -1,7 +1,7 @@
 -- QuestLogCollapse: Automatically collapses quest log when entering dungeons
 -- Author: Gaspode
 -- Contributors: Artherion77
--- Version: 1.5.9
+-- Version: 1.6.0
 -- Updated: 2026-10-24
 
 -- TAINT PROTECTION STRATEGY:
@@ -10,7 +10,7 @@
 
 -- Use addon namespace to prevent global variable pollution and taint
 local addonName, ns = ...
-local ADDON_VERSION = "1.5.9"
+local ADDON_VERSION = "1.6.0"
 
 -- Create addon frame (local to prevent global pollution)
 local QuestLogCollapse = CreateFrame("Frame")
@@ -588,8 +588,6 @@ local function OnAddonLoaded(loadedAddonName)
     end
 
     print("|cff00ff00QuestLogCollapse|r v" .. ADDON_VERSION .. " loaded. Type |cffff0000/qlc config|r for options.")
-    print(
-    "|cffff9900[QuestLogCollapse]|r Note: Some trackers (Quests, Bonus Objectives, World Quests) are disabled by default to prevent UI taint. Enable at your own risk.")
 
     RunWhenAddonReady("Initial state check", 40, 1, function()
         UpdateNamePlates()
@@ -814,11 +812,6 @@ function ns.HandleSlashCommand(msg)
 
         for _ in pairs(pendingOperations) do
             pendingCount = pendingCount + 1
-        end
-        for _, def in ipairs(TRACKER_DEFS) do
-            if TAINT_BLACKLIST[def.name] then
-                table.insert(blacklisted, def.label)
-            end
         end
 
         print("|cff00ff00QuestLogCollapse Diagnostics:|r")
