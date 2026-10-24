@@ -1,8 +1,8 @@
 -- QuestLogCollapse: Automatically collapses quest log when entering dungeons
 -- Author: Gaspode
 -- Contributors: Artherion77
--- Version: 1.5.6
--- Updated: 2026-08-17
+-- Version: 1.5.9
+-- Updated: 2026-10-24
 
 -- TAINT PROTECTION STRATEGY:
 -- Implemented namespace to avoid global variable pollution
@@ -10,7 +10,7 @@
 
 -- Use addon namespace to prevent global variable pollution and taint
 local addonName, ns = ...
-local ADDON_VERSION = "1.5.6"
+local ADDON_VERSION = "1.5.9"
 
 -- Create addon frame (local to prevent global pollution)
 local QuestLogCollapse = CreateFrame("Frame")
@@ -55,7 +55,6 @@ end
 local mapSystemBusy = false
 local mapSystemBusyUntil = 0
 local pendingOperations = {}
-local ProcessPendingOperations -- forward declaration
 
 -- Shared tracker definitions used by all tracker operations.
 local TRACKER_DEFS = {
@@ -95,8 +94,8 @@ local function CheckMapSystemBusy()
     if mapSystemBusy and GetTime() > mapSystemBusyUntil then
         mapSystemBusy = false
         mapSystemBusyUntil = 0
-        if ProcessPendingOperations then
-            ProcessPendingOperations()
+        if ns.ProcessPendingOperations then
+            ns.ProcessPendingOperations()
         end
     end
 end
@@ -159,12 +158,9 @@ local function GetLegacyDefaults()
     return LEGACY_DEFAULTS
 end
 
--- Initialize saved variables
-QuestLogCollapseDB = QuestLogCollapseDB or {}
-
 -- Debug print function (stored in namespace)
 local function DebugPrint(message)
-    local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or QuestLogCollapseDB
+    local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or ns.db
     if profile and profile.debug then
         print("|cff00ff00[QuestLogCollapse]|r " .. message)
     end
@@ -394,7 +390,7 @@ local function SafeExpandTracker(tracker, name)
     return true
 end
 
-ProcessPendingOperations = function()
+function ns.ProcessPendingOperations()
     if mapSystemBusy or InCombatLockdown() or not next(pendingOperations) then
         return
     end
@@ -468,7 +464,7 @@ local function FilterQuestsByZone()
         return
     end
 
-    local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or QuestLogCollapseDB
+    local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or ns.db
     if not profile or not profile.filterQuestsByZone then
         needsZoneFilter = false  -- Clear the flag
         return
@@ -644,7 +640,7 @@ local function RunWhenAddonReady(label, maxAttempts, intervalSeconds, callback, 
 end
 
 local function OnZoneChanged()
-    local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or QuestLogCollapseDB
+    local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or ns.db
 
     -- Set flag for zone filtering - will be triggered by user action (map open, movement, etc.)
     -- We can't call FilterQuestsByZone() directly here because it would cause taint
@@ -676,15 +672,17 @@ local function OnZoneChanged()
     end, true)  -- Allow callback during dungeon combat
 end
 
-local function OnAddonLoaded(addonName)
-    if addonName ~= "QuestLogCollapse" then
+local function OnAddonLoaded(loadedAddonName)
+    if loadedAddonName ~= addonName then
         return
     end
 
+    ns.InitializeConfigDB()
+
     -- Basic legacy fallback initialization - detailed profile config handled by config file.
     for key, value in pairs(GetLegacyDefaults()) do
-        if QuestLogCollapseDB[key] == nil then
-            QuestLogCollapseDB[key] = value
+        if ns.db[key] == nil then
+            ns.db[key] = value
         end
     end
 
@@ -693,7 +691,7 @@ local function OnAddonLoaded(addonName)
 
     RunWhenAddonReady("Initial state check", 40, 1, function()
         if IsInDungeon() then
-            local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or QuestLogCollapseDB
+            local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or ns.db
             if profile and profile.enabled and not InCombatLockdown() then
                 DebugPrint("Initial state check: in dungeon, applying collapse")
                 CollapseQuestLog()
@@ -703,7 +701,7 @@ local function OnAddonLoaded(addonName)
 end
 
 local function OnCombatStateChanged(event)
-    local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or QuestLogCollapseDB
+    local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or ns.db
     if not profile or not profile.enabled then
         DebugPrint("Addon disabled or no profile found")
         return
@@ -817,8 +815,9 @@ end
 -- Event handler
 QuestLogCollapse:SetScript("OnEvent", function(self, event, ...)
     if event == "ADDON_LOADED" then
-        local addonName = ...
-        if addonName == "QuestLogCollapse" then
+        local loadedAddonName = ...
+        if loadedAddonName == addonName then
+            OnAddonLoaded(loadedAddonName)
             SetMapSystemBusy(15)
         end
     elseif event == "PLAYER_ENTERING_WORLD" then
@@ -875,10 +874,7 @@ gcFrame:SetScript("OnUpdate", function()
 end)
 
 -- Slash command handler
-SLASH_QUESTLOGCOLLAPSE1 = "/qlc"
-SLASH_QUESTLOGCOLLAPSE2 = "/questlogcollapse"
-
-function SlashCmdList.QUESTLOGCOLLAPSE(msg)
+function ns.HandleSlashCommand(msg)
     local args = {}
     for word in msg:gmatch("%S+") do
         table.insert(args, word:lower())
@@ -915,13 +911,13 @@ function SlashCmdList.QUESTLOGCOLLAPSE(msg)
         print("Available sections: quests, achievements, bonus, scenarios,")
         print("campaigns, professions, monthly, widgets, adventuremaps")
     elseif args[1] == "toggle" then
-        local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or QuestLogCollapseDB
+        local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or ns.db
         if profile then
             profile.enabled = not profile.enabled
             print("|cff00ff00QuestLogCollapse|r " .. (profile.enabled and "enabled" or "disabled"))
         end
     elseif args[1] == "debug" then
-        local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or QuestLogCollapseDB
+        local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or ns.db
         if profile then
             profile.debug = not profile.debug
             print("|cff00ff00QuestLogCollapse|r debug " .. (profile.debug and "enabled" or "disabled"))
@@ -953,7 +949,7 @@ function SlashCmdList.QUESTLOGCOLLAPSE(msg)
             print("|cff00ff00QuestLogCollapse|r Configuration panel not available.")
         end
     elseif args[1] == "status" then
-        local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or QuestLogCollapseDB
+        local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or ns.db
         print("|cff00ff00QuestLogCollapse Status:|r")
         print("Enabled: " .. ((profile and profile.enabled) and "Yes" or "No"))
         print("Debug: " .. ((profile and profile.debug) and "Yes" or "No"))
@@ -990,8 +986,8 @@ function SlashCmdList.QUESTLOGCOLLAPSE(msg)
             end
         end
     elseif args[1] == "diag" then
-        local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or QuestLogCollapseDB
-        local profileName = (QuestLogCollapseCharDB and QuestLogCollapseCharDB.currentProfile) or "Default"
+        local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or ns.db
+        local profileName = (ns.charDB and ns.charDB.currentProfile) or "Default"
         local settings = ns.GetCurrentInstanceSettings and ns.GetCurrentInstanceSettings()
         local inInstance, instanceType = IsInInstance()
         local pendingCount = 0
@@ -1049,7 +1045,7 @@ function SlashCmdList.QUESTLOGCOLLAPSE(msg)
         if InCombatLockdown() then
             print("|cff00ff00QuestLogCollapse|r Cannot filter quests during combat")
         else
-            local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or QuestLogCollapseDB
+            local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or ns.db
             if profile and profile.filterQuestsByZone then
                 MarkZoneFilterTrigger("Manual command (/qlc filterzone)")
                 FilterQuestsByZone()
@@ -1124,6 +1120,11 @@ function SlashCmdList.QUESTLOGCOLLAPSE(msg)
         print("|cff00ff00QuestLogCollapse|r Unknown command. Type |cffff0000/qlc help|r for available commands.")
     end
 end
+
+-- WoW discovers slash commands through these global registrations.
+_G.SLASH_QUESTLOGCOLLAPSE1 = "/qlc"
+_G.SLASH_QUESTLOGCOLLAPSE2 = "/questlogcollapse"
+SlashCmdList.QUESTLOGCOLLAPSE = ns.HandleSlashCommand
 
 -- ============================================================================
 -- ZONE FILTERING AUTOMATIC TRIGGERS (Hardware-Event Hooks)
