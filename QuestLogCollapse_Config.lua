@@ -1,8 +1,8 @@
 -- QuestLogCollapse Configuration Panel
 -- Author: Gaspode
 -- Contributors: Artherion77 (significant ui revamp in 1.4.0)
--- Version: 1.5.6
--- Updated: 2026-08-17
+-- Version: 1.5.9
+-- Updated: 2026-10-24
 
 
 local addonName, ns = ...
@@ -146,40 +146,44 @@ local function EnsureProfileDefaults(profile)
 end
 
 local function InitializeConfigDB()
-    if not QuestLogCollapseDB then QuestLogCollapseDB = {} end
-    if not QuestLogCollapseDB.profiles then
-        QuestLogCollapseDB.profiles = { ["Default"] = getDefaultProfile() }
+    -- SavedVariables must remain global; runtime code shares the same tables via ns.
+    ns.db = _G.QuestLogCollapseDB or {}
+    ns.charDB = _G.QuestLogCollapseCharDB or {}
+    _G.QuestLogCollapseDB = ns.db
+    _G.QuestLogCollapseCharDB = ns.charDB
+
+    if not ns.db.profiles then
+        ns.db.profiles = { ["Default"] = getDefaultProfile() }
     end
-    if not QuestLogCollapseCharDB then QuestLogCollapseCharDB = {} end
-    if not QuestLogCollapseCharDB.currentProfile then
-        QuestLogCollapseCharDB.currentProfile = "Default"
+    if not ns.charDB.currentProfile then
+        ns.charDB.currentProfile = "Default"
     end
-    if not QuestLogCollapseDB.profiles[QuestLogCollapseCharDB.currentProfile] then
-        QuestLogCollapseDB.profiles[QuestLogCollapseCharDB.currentProfile] = getDefaultProfile()
+    if not ns.db.profiles[ns.charDB.currentProfile] then
+        ns.db.profiles[ns.charDB.currentProfile] = getDefaultProfile()
     end
 
     -- Migrate old flat settings into the profile system
     for k in pairs(defaults) do
-        if QuestLogCollapseDB[k] ~= nil and QuestLogCollapseDB.profiles["Default"][k] == nil then
-            QuestLogCollapseDB.profiles["Default"][k] = QuestLogCollapseDB[k]
-            QuestLogCollapseDB[k] = nil
+        if ns.db[k] ~= nil and ns.db.profiles["Default"][k] == nil then
+            ns.db.profiles["Default"][k] = ns.db[k]
+            ns.db[k] = nil
         end
     end
 
-    for _, profile in pairs(QuestLogCollapseDB.profiles) do
+    for _, profile in pairs(ns.db.profiles) do
         EnsureProfileDefaults(profile)
     end
 end
 
 local function getProfile()
-    if not QuestLogCollapseDB or not QuestLogCollapseDB.profiles
-       or not QuestLogCollapseCharDB or not QuestLogCollapseCharDB.currentProfile then
+    if not ns.db or not ns.db.profiles
+       or not ns.charDB or not ns.charDB.currentProfile then
         return getDefaultProfile()
     end
-    local profile = QuestLogCollapseDB.profiles[QuestLogCollapseCharDB.currentProfile]
+    local profile = ns.db.profiles[ns.charDB.currentProfile]
     if not profile then
         profile = getDefaultProfile()
-        QuestLogCollapseDB.profiles[QuestLogCollapseCharDB.currentProfile] = profile
+        ns.db.profiles[ns.charDB.currentProfile] = profile
     end
     return EnsureProfileDefaults(profile)
 end
@@ -478,8 +482,8 @@ local function CreateBasicOptionsPanel()
     -- refreshProfileDD is wired up once RefreshQLCProfileDropdown is defined below
     local refreshProfileDD = nil
 
-    if not StaticPopupDialogs["QUESTLOGCOLLAPSE_NEW_PROFILE"] then
-        StaticPopupDialogs["QUESTLOGCOLLAPSE_NEW_PROFILE"] = {
+    if not ns.NewProfileDialog then
+        ns.NewProfileDialog = {
             text = "Enter new profile name:",
             button1 = "Create", button2 = "Cancel",
             hasEditBox = true, maxLetters = 32,
@@ -487,21 +491,22 @@ local function CreateBasicOptionsPanel()
                 local editBox = self.editBox or self.EditBox
                 local name = editBox and editBox:GetText():gsub("^%s+", ""):gsub("%s+$", "") or ""
                 if name == "" then return end
-                if QuestLogCollapseDB.profiles[name] then
+                if ns.db.profiles[name] then
                     print("|cffff0000QuestLogCollapse|r Profile already exists.")
                     return
                 end
-                QuestLogCollapseDB.profiles[name] = getDefaultProfile()
-                QuestLogCollapseCharDB.currentProfile = name
+                ns.db.profiles[name] = getDefaultProfile()
+                ns.charDB.currentProfile = name
                 if refreshProfileDD then refreshProfileDD() end
                 print("|cff00ff00QuestLogCollapse|r Created profile: " .. name)
             end,
             timeout = 0, whileDead = true, exclusive = true,
             hideOnEscape = true, preferredIndex = 3,
         }
+        StaticPopupDialogs["QUESTLOGCOLLAPSE_NEW_PROFILE"] = ns.NewProfileDialog
     end
 
-    basicPanel = CreateFrame("Frame", "QuestLogCollapseConfigPanel", UIParent, "BackdropTemplate")
+    basicPanel = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
     basicPanel.name      = "QuestLogCollapse"
     basicPanel.OnCommit  = function() end
     basicPanel.OnDefault = function() end
@@ -651,26 +656,26 @@ local function CreateBasicOptionsPanel()
     -- PROFILE DROPDOWN
     -- --------------------------------------------------------
     local function RefreshQLCProfileDropdown()
-        if not QuestLogCollapseDB or not QuestLogCollapseDB.profiles or not QuestLogCollapseCharDB then
+        if not ns.db or not ns.db.profiles or not ns.charDB then
             return
         end
         local items = {}
-        for k in pairs(QuestLogCollapseDB.profiles) do table.insert(items, k) end
+        for k in pairs(ns.db.profiles) do table.insert(items, k) end
         table.sort(items)
 
         UIDropDownMenu_Initialize(profileDD, function()
             for _, name in ipairs(items) do
                 local info = UIDropDownMenu_CreateInfo()
                 info.text    = name
-                info.checked = (name == QuestLogCollapseCharDB.currentProfile)
+                info.checked = (name == ns.charDB.currentProfile)
                 info.func    = function()
-                    QuestLogCollapseCharDB.currentProfile = name
+                    ns.charDB.currentProfile = name
                     if basicPanel.OnShow then basicPanel:OnShow() end
                 end
                 UIDropDownMenu_AddButton(info)
             end
         end)
-        UIDropDownMenu_SetSelectedValue(profileDD, QuestLogCollapseCharDB.currentProfile)
+        UIDropDownMenu_SetSelectedValue(profileDD, ns.charDB.currentProfile)
     end
 
     refreshProfileDD = RefreshQLCProfileDropdown  -- wire up the StaticPopup upvalue
@@ -720,23 +725,20 @@ end
 -- EVENTS + REGISTRATION
 -- ============================================================
 local configEventFrame = CreateFrame("Frame")
-configEventFrame:RegisterEvent("ADDON_LOADED")
 configEventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 
 local panelRegistered = false
 local allPanels       = {}
 
 local function SwitchProfile(profileName)
-    QuestLogCollapseCharDB.currentProfile = profileName
+    ns.charDB.currentProfile = profileName
     for _, p in ipairs(allPanels) do
         if p.OnShow then p:OnShow() end
     end
 end
 
-configEventFrame:SetScript("OnEvent", function(self, event, arg1)
-    if event == "ADDON_LOADED" and arg1 == "QuestLogCollapse" then
-        InitializeConfigDB()
-    elseif event == "PLAYER_ENTERING_WORLD" then
+configEventFrame:SetScript("OnEvent", function(self, event)
+    if event == "PLAYER_ENTERING_WORLD" then
         if not panelRegistered then
             -- Create all panels
             local basicOpts    = CreateBasicOptionsPanel()
@@ -805,6 +807,7 @@ local function GetCurrentQLCProfile()
 end
 
 ns.CreateQuestLogCollapseConfigPanel = CreateBasicOptionsPanel
+ns.InitializeConfigDB                = InitializeConfigDB
 ns.GetCurrentInstanceSettings        = GetCurrentInstanceSettings
 ns.GetCurrentQLCProfile              = GetCurrentQLCProfile
 ns.SwitchProfile                     = SwitchProfile

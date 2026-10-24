@@ -175,6 +175,23 @@ To avoid taint issues with protected quest tracking functions, zone filtering is
 - `QuestLogCollapseDB` - Global settings and profiles
 - `QuestLogCollapseCharDB` - Character-specific settings (current profile)
 
+### Addon Namespace
+
+Both Lua files share WoW's private addon namespace (`local addonName, ns = ...`).
+Shared functions and dialog definitions live on `ns`; implementation helpers, frames,
+and transient state stay file-local. No addon frames are globally named.
+
+Saved variables are bound at `ADDON_LOADED` as `ns.db` and `ns.charDB`, referencing
+the original tables without changing existing profiles or saved-variable names.
+Only WoW-required registrations remain global: the two saved variables,
+`SLASH_QUESTLOGCOLLAPSE1/2`, the `SlashCmdList.QUESTLOGCOLLAPSE` handler, and
+`StaticPopupDialogs.QUESTLOGCOLLAPSE_NEW_PROFILE`. Namespacing prevents accidental
+global pollution; it does not make protected Blizzard API calls taint-free.
+
+Run `lua5.1 tests/namespace.lua` from the repository root to check namespace
+isolation, saved-variable identity, settings registration, and deferred operations
+with a mocked WoW environment.
+
 ## Compatibility
 
 - **WoW Version**: Compatible with retail World of Warcraft (Interface 120000, 120001, 120500, 120700)
@@ -253,6 +270,11 @@ Feel free to submit issues, feature requests, or pull requests to improve this a
 This project is open source. Feel free to modify and distribute as needed.
 
 ## Changelog
+
+### Version 1.5.7
+
+- Tightened up namespacing and added more error handling to prevent taint issues
+- Added tests for namespace isolation, saved-variable identity, settings registration, and deferred operations with a mocked WoW environment.
 
 ### Version 1.5.6
 
