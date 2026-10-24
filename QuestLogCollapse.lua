@@ -1,7 +1,7 @@
 -- QuestLogCollapse: Automatically collapses quest log when entering dungeons
 -- Author: Gaspode
 -- Contributors: Artherion77
--- Version: 1.5.9
+-- Version: 1.6.0
 -- Updated: 2026-10-24
 
 -- TAINT PROTECTION STRATEGY:
@@ -10,7 +10,7 @@
 
 -- Use addon namespace to prevent global variable pollution and taint
 local addonName, ns = ...
-local ADDON_VERSION = "1.5.9"
+local ADDON_VERSION = "1.6.0"
 
 -- Create addon frame (local to prevent global pollution)
 local QuestLogCollapse = CreateFrame("Frame")

@@ -1,7 +1,7 @@
 -- QuestLogCollapse Configuration Panel
 -- Author: Gaspode
 -- Contributors: Artherion77 (significant ui revamp in 1.4.0)
--- Version: 1.5.9
+-- Version: 1.6.0
 -- Updated: 2026-10-24
 
 
@@ -379,13 +379,13 @@ local function BuildContainer(parent, instanceInfo, yTopLeft, isLegacy)
     -- Nameplate toggle
     local namePlatesCheck = CreateFrame("CheckButton", nil, container, "InterfaceOptionsCheckButtonTemplate")
     namePlatesCheck:SetPoint("TOPLEFT", container, "TOPLEFT", 5, -79)
-    namePlatesCheck.Text:SetText("Show Enemy Name Plates")
+    namePlatesCheck.Text:SetText("Force Show Enemy Name Plates")
     namePlatesCheck.key = instanceInfo.key
-    Tip(namePlatesCheck, "Show Enemy Name Plates",
+    Tip(namePlatesCheck, "Force Show Enemy Name Plates",
         instanceInfo.key == "defaultSettings"
             and "Enable enemy nameplates when default settings are used."
             or "Automatically enable enemy nameplates when entering " .. instanceInfo.name .. ".",
-        "Your original setting is restored when the current zone type does not request nameplates.",
+        "Your original setting is restored when the current zone type does not request nameplates. If Enemy Name Plates are set to show in your Default Game Options, unchecking this will not hide them. If you manually toggle nameplates while in a zone, your choice is respected until you leave the zone.",
         "Controls the |cffffcc00nameplateShowEnemies|r game CVar.")
     namePlatesCheck:SetScript("OnClick", function(self)
         local prof = getProfile()
