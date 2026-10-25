@@ -1,8 +1,8 @@
 -- QuestLogCollapse Configuration Panel
 -- Author: Gaspode
 -- Contributors: Artherion77 (significant ui revamp in 1.4.0)
--- Version: 1.6.0
--- Updated: 2026-10-24
+-- Version: 1.6.1
+-- Updated: 2026-10-25
 
 
 local addonName, ns = ...
@@ -287,28 +287,28 @@ local SECTIONS_ROW1  = {
         key = "collapseQuests",
         label = "Quests",
         tip =
-        "Collapse the Quest tracker (QuestObjectiveTracker).\nShows standard quests with objectives in your current area.\n|cffff9900Caution:|r Tracked quests with UIWidget content (e.g. delve coffer-key timers) taint Area POI tooltip widths. Off by default."
+        "Make the Quest tracker transparent (alpha 0).\nShows standard quests with objectives in your current area.\nLayout space and mouse interaction are unchanged."
     },
     {
         key = "collapseAchievements",
         label = "Achievements",
-        tip = "Collapse the Achievement tracker.\nShows progress toward tracked achievement criteria."
+        tip = "Make the Achievement tracker transparent (alpha 0).\nShows progress toward tracked achievement criteria.\nLayout space and mouse interaction are unchanged."
     },
     {
         key = "collapseBonusObjectives",
         label = "Bonus",
         tip =
-        "Collapse the Bonus Objective tracker.\nShows area bonus objectives and rare encounters.\n|cffff9900Caution:|r Can cause taint on Area POI tooltips in some builds. Off by default."
+        "Make the Bonus Objective tracker transparent (alpha 0).\nShows area bonus objectives and rare encounters.\nLayout space and mouse interaction are unchanged."
     },
     {
         key = "collapseCampaigns",
         label = "Campaigns",
-        tip = "Collapse the Campaign Quest tracker.\nTracks story campaign and chapter quest chains."
+        tip = "Make the Campaign Quest tracker transparent (alpha 0).\nTracks story campaign and chapter quest chains.\nLayout space and mouse interaction are unchanged."
     },
     {
         key = "collapseScenarios",
         label = "Scenario",
-        tip = "Collapse the Scenario/Dungeon objective tracker.\nShows dungeon and scenario step objectives."
+        tip = "Make the Scenario/Dungeon objective tracker transparent (alpha 0).\nShows dungeon and scenario step objectives.\nLayout space and mouse interaction are unchanged."
     },
 }
 local SECTIONS_ROW2  = {
@@ -316,30 +316,30 @@ local SECTIONS_ROW2  = {
         key = "collapseWorldQuests",
         label = "World Quests",
         tip =
-        "Collapse the World Quest tracker.\nShows world quests on the map.\n|cffff9900Caution:|r May cause world map system taint. Off by default."
+        "Make the World Quest tracker transparent (alpha 0).\nShows world quests on the map.\nLayout space and mouse interaction are unchanged."
     },
     {
         key = "collapseProfessions",
         label = "Professions",
-        tip = "Collapse the Profession Recipe tracker.\nShows active crafting work orders and profession recipes."
+        tip = "Make the Profession Recipe tracker transparent (alpha 0).\nShows active crafting work orders and profession recipes.\nLayout space and mouse interaction are unchanged."
     },
     {
         key = "collapseMonthlyActivities",
         label = "Monthly",
         tip =
-        "Collapse the Monthly Activities tracker.\nShows seasonal event and monthly quest progress bars.\n|cffff9900Caution:|r UIWidget status bars can cause taint. Off by default."
+        "Make the Monthly Activities tracker transparent (alpha 0).\nShows seasonal event and monthly quest progress bars.\nLayout space and mouse interaction are unchanged."
     },
     {
         key = "collapseUIWidgets",
         label = "Widgets",
         tip =
-        "Collapse the UI Widget objective tracker.\nShows general widget-based objectives.\n|cffff9900Caution:|r Directly manages widget pool frames — can cause taint. Off by default."
+        "Make the UI Widget objective tracker transparent (alpha 0).\nShows general widget-based objectives.\nLayout space and mouse interaction are unchanged."
     },
     {
         key = "collapseAdventureMaps",
         label = "Adventure",
         tip =
-        "Collapse the Adventure Map Quest tracker.\nShows objectives from the adventure map.\n|cffff9900Caution:|r Can cause world map system taint. Off by default."
+        "Make the Adventure Map Quest tracker transparent (alpha 0).\nShows objectives from the adventure map.\nLayout space and mouse interaction are unchanged."
     },
 }
 
@@ -700,7 +700,7 @@ local function CreateBasicOptionsPanel()
     enabledCheck.Text:SetText("Enable QuestLogCollapse")
     Tip(enabledCheck, "Enable QuestLogCollapse",
         "Master on/off switch for the entire addon.",
-        "When disabled, no trackers are collapsed or expanded and zone filtering does not run.",
+        "When disabled, no section alpha changes are applied and zone filtering does not run.",
         "Toggle with |cffffcc00/qlc toggle|r.")
 
     -- --------------------------------------------------------

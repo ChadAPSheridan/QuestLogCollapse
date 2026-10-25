@@ -1,8 +1,8 @@
--- QuestLogCollapse: Automatically collapses quest log when entering dungeons
+-- QuestLogCollapse: Automatically fades quest tracker sections when entering instances
 -- Author: Gaspode
 -- Contributors: Artherion77
--- Version: 1.6.0
--- Updated: 2026-10-24
+-- Version: 1.6.1
+-- Updated: 2026-10-25
 
 -- TAINT PROTECTION STRATEGY:
 -- Implemented namespace to avoid global variable pollution
@@ -10,7 +10,7 @@
 
 -- Use addon namespace to prevent global variable pollution and taint
 local addonName, ns = ...
-local ADDON_VERSION = "1.6.0"
+local ADDON_VERSION = "1.6.1"
 
 -- Create addon frame (local to prevent global pollution)
 local QuestLogCollapse = CreateFrame("Frame")
@@ -57,14 +57,7 @@ for _, def in ipairs(TRACKER_DEFS) do
     TRACKER_DEF_BY_NAME[def.name] = def
 end
 
-local function IsScenarioTracker(tracker, name)
-    return name == "Scenario" or tracker == ScenarioObjectiveTracker
-end
-
 local function QueuePendingOperation(trackerName, action)
-    if trackerName == "Scenario" then
-        return
-    end
     pendingOperations[trackerName] = { action = action, trackerName = trackerName }
 end
 
@@ -139,11 +132,26 @@ local function GetLegacyDefaults()
     return LEGACY_DEFAULTS
 end
 
+MyAddonDB = MyAddonDB or { logs = {} }
+
+local function LogMessage(msg)
+    local timestamp = date("%H:%M:%S")
+    table.insert(MyAddonDB.logs, "[" .. timestamp .. "] " .. msg)
+
+    -- Optional: Keep the log from growing infinitely large
+    if #MyAddonDB.logs > 500 then
+        table.remove(MyAddonDB.logs, 1)
+    end
+end
+
+ns.LogMessage = LogMessage
+
 -- Debug print function (stored in namespace)
 local function DebugPrint(message)
     local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or ns.db
     if profile and profile.debug then
         print("|cff00ff00[QuestLogCollapse]|r " .. message)
+        LogMessage(message)
     end
 end
 -- Make DebugPrint available to other addon files via namespace
@@ -186,27 +194,22 @@ local function UpdateNamePlates()
 end
 ns.UpdateNamePlates = UpdateNamePlates
 
--- Safe function to collapse a tracker
+-- Keep legacy operation names and saved settings; only change visual alpha.
 local function SafeCollapseTracker(tracker, name, shouldCollapse)
     if not isFullyLoaded or not tracker or not shouldCollapse then
         DebugPrint(name .. " not found, not fully loaded, or shouldCollapse is false")
         return false
     end
 
-    if IsScenarioTracker(tracker, name) then
-        DebugPrint("Skipping Scenario tracker (taint-prone secure path)")
-        return false
-    end
-
     -- NEVER manipulate trackers during combat to avoid taint
     if InCombatLockdown() then
-        DebugPrint("Skipping " .. name .. " collapse - in combat")
+        DebugPrint("Skipping " .. name .. " transparency - in combat")
         return false
     end
 
     -- Avoid operations when map system might be busy
     if mapSystemBusy then
-        DebugPrint("Deferring " .. name .. " collapse - map system busy")
+        DebugPrint("Deferring " .. name .. " transparency - map system busy")
         QueuePendingOperation(name, "collapse")
         return true
     end
@@ -217,13 +220,13 @@ local function SafeCollapseTracker(tracker, name, shouldCollapse)
         return true
     end
 
-    -- Execute directly since we already verified we are out of combat
-    if tracker.SetCollapsed and type(tracker.SetCollapsed) == "function" then
-        tracker:SetCollapsed(true)
-        DebugPrint(name .. " section collapsed successfully")
+    if type(tracker.SetAlpha) == "function" then
+        tracker:SetAlpha(0)
+        DebugPrint(name .. " section made transparent")
         return true
     end
 
+    DebugPrint(name .. " section has no SetAlpha method")
     return false
 end
 
@@ -245,11 +248,11 @@ local function CollapseQuestLog()
     end
 
     if not settings.enabled then
-        DebugPrint("Instance type not enabled for collapsing")
+        DebugPrint("Instance type not enabled for transparency")
         return
     end
 
-    DebugPrint("Instance settings found and enabled, proceeding with collapse")
+    DebugPrint("Instance settings found and enabled, applying transparency")
 
 
     local collapsed = 0
@@ -260,30 +263,25 @@ local function CollapseQuestLog()
         end
     end
 
-    DebugPrint("Collapsed " .. collapsed .. " sections")
+    DebugPrint("Made " .. collapsed .. " sections transparent")
 end
 
--- Safe function to expand a tracker
+-- Restore section opacity without touching Blizzard's collapsed state or layout.
 local function SafeExpandTracker(tracker, name)
     if not isFullyLoaded or not tracker then
         DebugPrint(name .. " not found or not fully loaded")
         return false
     end
 
-    if IsScenarioTracker(tracker, name) then
-        DebugPrint("Skipping Scenario tracker (taint-prone secure path)")
-        return false
-    end
-
     -- NEVER manipulate trackers during combat to avoid taint
     if InCombatLockdown() then
-        DebugPrint("Skipping " .. name .. " expand - in combat")
+        DebugPrint("Skipping " .. name .. " opacity restoration - in combat")
         return false
     end
 
     -- Avoid operations when map system might be busy
     if mapSystemBusy then
-        DebugPrint("Deferring " .. name .. " expand - map system busy")
+        DebugPrint("Deferring " .. name .. " opacity restoration - map system busy")
         QueuePendingOperation(name, "expand")
         return true
     end
@@ -294,13 +292,13 @@ local function SafeExpandTracker(tracker, name)
         return true
     end
 
-    -- Execute directly since we already verified we are out of combat
-    if tracker.SetCollapsed and type(tracker.SetCollapsed) == "function" then
-        tracker:SetCollapsed(false)
-        DebugPrint(name .. " section expanded successfully")
+    if type(tracker.SetAlpha) == "function" then
+        tracker:SetAlpha(1)
+        DebugPrint(name .. " section made opaque")
         return true
     end
 
+    DebugPrint(name .. " section has no SetAlpha method")
     return false
 end
 
@@ -331,8 +329,7 @@ local function ExpandQuestLog()
         return
     end
 
-    -- When leaving an instance, expand all sections regardless of settings
-    -- This ensures we restore the original state
+    -- When leaving an instance, restore opacity for all sections.
 
     DebugPrint("ExpandQuestLog() called")
     local expanded = 0
@@ -342,8 +339,7 @@ local function ExpandQuestLog()
             expanded = expanded + 1
         end
     end
-    DebugPrint("Expanded " .. expanded .. " sections/modules")
-    DebugPrint("Expanded " .. expanded .. " sections/modules")
+    DebugPrint("Made " .. expanded .. " sections/modules opaque")
 end
 
 -- Filter quests by current zone
@@ -552,7 +548,7 @@ local function OnZoneChanged()
     end
 
     if not profile or not profile.enabled then
-        DebugPrint("Addon disabled or no profile found (skipping collapse/expand)")
+        DebugPrint("Addon disabled or no profile found (skipping alpha changes)")
         return
     end
 
@@ -564,10 +560,10 @@ local function OnZoneChanged()
         DebugPrint("Instance check: inInstance=" .. tostring(inInstance) .. ", type=" .. tostring(instanceType))
 
         if IsInDungeon() then
-            DebugPrint("Entered instance - collapsing configured sections")
+            DebugPrint("Entered instance - making configured sections transparent")
             CollapseQuestLog()
         else
-            DebugPrint("Left instance - expanding all collapsed sections")
+            DebugPrint("Left instance - restoring section opacity")
             ExpandQuestLog()
         end
     end, true) -- Allow callback during dungeon combat
@@ -594,7 +590,7 @@ local function OnAddonLoaded(loadedAddonName)
         if IsInDungeon() then
             local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or ns.db
             if profile and profile.enabled and not InCombatLockdown() then
-                DebugPrint("Initial state check: in dungeon, applying collapse")
+                DebugPrint("Initial state check: in dungeon, applying transparency")
                 CollapseQuestLog()
             end
         end
@@ -612,16 +608,16 @@ local function OnCombatStateChanged(event)
         DebugPrint("Leaving combat - checking queued operations and quest log state")
 
         if combatStateQueue.enteredCombatOutsideInstance and combatStateQueue.shouldCollapseOnCombatEnd then
-            DebugPrint("Applying queued collapse operation after combat")
+            DebugPrint("Applying queued transparency after combat")
             CollapseQuestLog()
             combatStateQueue.shouldCollapseOnCombatEnd = false
             combatStateQueue.trackersWereCollapsedInCombat = true
         elseif combatStateQueue.shouldExpandOnCombatEnd then
-            DebugPrint("Applying queued expand operation after combat")
+            DebugPrint("Applying queued opacity restoration after combat")
             ExpandQuestLog()
             combatStateQueue.shouldExpandOnCombatEnd = false
         elseif combatStateQueue.enteredCombatOutsideInstance then
-            DebugPrint("Combat ended outside instance but no trackers were collapsed - no expansion needed")
+            DebugPrint("Combat ended outside instance with no queued alpha changes")
         end
 
         -- Reset combat tracking
@@ -704,8 +700,8 @@ function ns.HandleSlashCommand(msg)
         print("|cffff0000/qlc toggle|r - Toggle addon on/off")
         print("|cffff0000/qlc debug|r - Toggle debug messages")
         print("|cffff0000/qlc status|r - Show current status and combat queue")
-        print("|cffff0000/qlc collapse|r - Manually collapse configured sections")
-        print("|cffff0000/qlc expand|r - Manually expand all collapsed sections")
+        print("|cffff0000/qlc collapse|r - Make configured sections transparent (alpha 0)")
+        print("|cffff0000/qlc expand|r - Restore all section opacity (alpha 1)")
         print("|cffff0000/qlc filterzone|r - Filter quests by current zone (manual)")
         print("|cffff0000/qlc diag|r - Show concise diagnostic summary")
         print("|cffff0000/qlc test|r - Test objective tracker detection")
@@ -784,9 +780,8 @@ function ns.HandleSlashCommand(msg)
 
         print("|cff00ff00Combat Queue Status:|r")
         print("  Entered Combat Outside Instance: " .. (combatStateQueue.enteredCombatOutsideInstance and "Yes" or "No"))
-        print("  Collapse Queued: " .. (combatStateQueue.shouldCollapseOnCombatEnd and "Yes" or "No"))
-        print("  Expand Queued: " .. (combatStateQueue.shouldExpandOnCombatEnd and "Yes" or "No"))
-        print("  Trackers Collapsed in Combat: " .. (combatStateQueue.trackersWereCollapsedInCombat and "Yes" or "No"))
+        print("  Transparency Queued: " .. (combatStateQueue.shouldCollapseOnCombatEnd and "Yes" or "No"))
+        print("  Opacity Restoration Queued: " .. (combatStateQueue.shouldExpandOnCombatEnd and "Yes" or "No"))
 
         print("|cff00ff00Nameplate Status:|r")
         print("  Addon Controlled: " .. (namePlateState.addonControlled and "Yes" or "No"))
@@ -799,7 +794,7 @@ function ns.HandleSlashCommand(msg)
         for _, def in ipairs(TRACKER_DEFS) do
             local tracker = def.getter()
             if tracker then
-                print(def.label .. ": " .. (tracker.collapsed and "Collapsed" or "Expanded"))
+                print(def.label .. ": alpha " .. tostring(tracker:GetAlpha()))
             end
         end
     elseif args[1] == "diag" then
@@ -808,7 +803,6 @@ function ns.HandleSlashCommand(msg)
         local settings = ns.GetCurrentInstanceSettings and ns.GetCurrentInstanceSettings()
         local inInstance, instanceType = IsInInstance()
         local pendingCount = 0
-        local blacklisted = {}
 
         for _ in pairs(pendingOperations) do
             pendingCount = pendingCount + 1
@@ -823,16 +817,16 @@ function ns.HandleSlashCommand(msg)
         print("Pending operations: " .. tostring(pendingCount))
         print("Zone filter pending: " .. (needsZoneFilter and "Yes" or "No"))
         print("Last zone filter trigger: " .. tostring(lastZoneFilterTrigger))
-        print("Blacklisted trackers: " .. (#blacklisted > 0 and table.concat(blacklisted, ", ") or "None"))
+        print("Tracker mode: section alpha (0 = transparent, 1 = opaque); layout unchanged")
         if settings then
-            print("Configured collapses in current context:")
+            print("Configured transparent sections in current context:")
             for _, def in ipairs(TRACKER_DEFS) do
                 print("  " .. def.label .. ": " .. (settings[def.settingKey] and "Yes" or "No"))
             end
         end
     elseif args[1] == "collapse" then
         if InCombatLockdown() then
-            print("|cff00ff00QuestLogCollapse|r Cannot collapse during combat - will apply when combat ends")
+            print("|cff00ff00QuestLogCollapse|r Cannot change section alpha during combat - will apply when combat ends")
             -- Queue the operation if we're outside dungeons
             if not IsInDungeon() then
                 combatStateQueue.shouldCollapseOnCombatEnd = true
@@ -840,17 +834,17 @@ function ns.HandleSlashCommand(msg)
             end
         else
             CollapseQuestLog()
-            print("|cff00ff00QuestLogCollapse|r manually collapsed configured sections")
+            print("|cff00ff00QuestLogCollapse|r requested alpha 0 for configured sections (layout unchanged)")
         end
     elseif args[1] == "expand" then
         if InCombatLockdown() then
-            print("|cff00ff00QuestLogCollapse|r Cannot expand during combat - canceling any queued operations")
+            print("|cff00ff00QuestLogCollapse|r Cannot change section alpha during combat - opacity restoration queued")
             -- Cancel any queued operations and clear combat state
             combatStateQueue.shouldCollapseOnCombatEnd = false
             combatStateQueue.shouldExpandOnCombatEnd = true
         else
             ExpandQuestLog()
-            print("|cff00ff00QuestLogCollapse|r manually expanded all collapsed sections")
+            print("|cff00ff00QuestLogCollapse|r requested alpha 1 for all sections")
         end
     elseif args[1] == "filterzone" then
         -- Manual zone filter trigger (always safe from slash command)
@@ -885,16 +879,15 @@ function ns.HandleSlashCommand(msg)
         end
         print("|cff00ff00Combat Queue Status:|r")
         print("  Entered Combat Outside Instance: " .. (combatStateQueue.enteredCombatOutsideInstance and "Yes" or "No"))
-        print("  Collapse Queued: " .. (combatStateQueue.shouldCollapseOnCombatEnd and "Yes" or "No"))
-        print("  Expand Queued: " .. (combatStateQueue.shouldExpandOnCombatEnd and "Yes" or "No"))
-        print("  Trackers Collapsed in Combat: " .. (combatStateQueue.trackersWereCollapsedInCombat and "Yes" or "No"))
+        print("  Transparency Queued: " .. (combatStateQueue.shouldCollapseOnCombatEnd and "Yes" or "No"))
+        print("  Opacity Restoration Queued: " .. (combatStateQueue.shouldExpandOnCombatEnd and "Yes" or "No"))
     elseif args[1] == "testcombat" then
         print("|cff00ff00QuestLogCollapse Current Settings Test:|r")
         local settings = ns.GetCurrentInstanceSettings and ns.GetCurrentInstanceSettings()
         if settings then
             print("Current Settings Found: " .. (settings.enabled and "Enabled" or "Disabled"))
             if settings.enabled then
-                print("Configured Collapse Sections:")
+                print("Configured Transparent Sections:")
                 print("  Quests: " .. (settings.collapseQuests and "Yes" or "No"))
                 print("  Achievements: " .. (settings.collapseAchievements and "Yes" or "No"))
                 print("  Bonus Objectives: " .. (settings.collapseBonusObjectives and "Yes" or "No"))

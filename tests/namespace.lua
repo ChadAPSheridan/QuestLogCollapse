@@ -59,6 +59,8 @@ local function run(savedDB, savedCharDB)
     function methods:GetChecked() return self.checked end
     function methods:GetName() return self.name end
     function methods:IsShown() return self.shown end
+    function methods:SetAlpha(alpha) self.alpha = alpha end
+    function methods:GetAlpha() return self.alpha or 1 end
     function methods:Hide() self.shown = false end
     function methods:Show()
         if self.shown then return end
@@ -113,8 +115,20 @@ local function run(savedDB, savedCharDB)
         RegisterAddOnCategory = function() end,
         OpenToCategory = function(id) categories[id]:Show() end,
     }
-    globals.QuestObjectiveTracker = widget()
-    function globals.QuestObjectiveTracker:SetCollapsed(collapsed) self.collapsed = collapsed end
+    local trackers = {}
+    for _, name in ipairs({
+        "QuestObjectiveTracker", "AchievementObjectiveTracker", "BonusObjectiveTracker",
+        "ScenarioObjectiveTracker", "CampaignQuestObjectiveTracker", "WorldQuestObjectiveTracker",
+        "ProfessionsRecipeTracker", "MonthlyActivitiesObjectiveTracker",
+        "UIWidgetObjectiveTracker", "AdventureMapQuestObjectiveTracker",
+    }) do
+        local tracker = widget()
+        tracker.isCollapsed = true
+        function tracker:SetCollapsed() error("Native collapse must not be called") end
+        function tracker:MarkDirty() error("Tracker layout must not be dirtied") end
+        trackers[#trackers + 1] = tracker
+        globals[name] = tracker
+    end
     globals.ObjectiveTrackerFrame = widget()
 
     local function event(name, ...)
@@ -130,6 +144,11 @@ local function run(savedDB, savedCharDB)
             local frame = frames[i]
             if frame.scripts.OnUpdate then frame.scripts.OnUpdate(frame) end
         end
+    end
+    local function runTimers()
+        local queued = timers
+        timers = {}
+        for _, callback in ipairs(queued) do callback() end
     end
     local ns = {}
     for line in io.lines("QuestLogCollapse.toc") do
@@ -179,6 +198,9 @@ local function run(savedDB, savedCharDB)
     local defaultSettings = ns.GetCurrentQLCProfile().defaultSettings
     assert(ns.GetCurrentInstanceSettings() == defaultSettings, "Open-world context did not use default settings")
     defaultSettings.enabled, defaultSettings.collapseQuests = true, true
+    for key in pairs(defaultSettings) do
+        if key:match("^collapse") then defaultSettings[key] = true end
+    end
     defaultSettings.namePlates.enabled = true
     ns.UpdateNamePlates()
     assert(enemyNameplates == "1", "Default settings did not enable enemy nameplates")
@@ -199,19 +221,53 @@ local function run(savedDB, savedCharDB)
     ns.UpdateNamePlates()
     assert(enemyNameplates == "0", "Default settings did not restore the original nameplate state")
     ns.HandleSlashCommand("collapse")
-    assert(globals.QuestObjectiveTracker.collapsed == nil)
+    for _, tracker in ipairs(trackers) do
+        assert(tracker:GetAlpha() == 1, "Alpha changed before deferred work ran")
+    end
     now = 16
     update()
     update()
-    assert(globals.QuestObjectiveTracker.collapsed == true, "Pending collapse was not processed")
+    for _, tracker in ipairs(trackers) do
+        assert(tracker:GetAlpha() == 0, "Pending transparency was not applied to every section")
+        assert(tracker.isCollapsed == true, "Native collapsed state changed")
+        assert(tracker:IsShown(), "Transparency must not hide the frame")
+    end
+    assert(globals.ObjectiveTrackerFrame:GetAlpha() == 1, "Whole tracker was made transparent")
     ns.HandleSlashCommand("expand")
     update()
-    assert(globals.QuestObjectiveTracker.collapsed == false)
+    for _, tracker in ipairs(trackers) do
+        assert(tracker:GetAlpha() == 1, "Section opacity was not restored")
+        assert(tracker.isCollapsed == true, "Native collapsed state changed on restoration")
+    end
+    defaultSettings.collapseScenarios = false
+    ns.HandleSlashCommand("collapse")
+    assert(globals.ScenarioObjectiveTracker:GetAlpha() == 1, "Unselected section was changed")
+    assert(globals.QuestObjectiveTracker:GetAlpha() == 0, "Selected section was not made transparent")
     inCombat = true
     ns.HandleSlashCommand("expand")
+    assert(globals.QuestObjectiveTracker:GetAlpha() == 0, "Alpha changed during combat")
     inCombat = false
     event("PLAYER_REGEN_ENABLED")
     update()
+    assert(globals.QuestObjectiveTracker:GetAlpha() == 1, "Combat-deferred opacity was not restored")
+
+    instanceType = "party"
+    dungeonSettings.enabled, dungeonSettings.collapseCampaigns = true, true
+    event("ZONE_CHANGED_NEW_AREA")
+    now = 25
+    update()
+    runTimers()
+    assert(globals.CampaignQuestObjectiveTracker:GetAlpha() == 0, "Instance entry did not apply transparency")
+    assert(globals.QuestObjectiveTracker:GetAlpha() == 1, "Instance entry changed an unselected section")
+    instanceType = "none"
+    event("ZONE_CHANGED_NEW_AREA")
+    now = 34
+    update()
+    runTimers()
+    for _, tracker in ipairs(trackers) do
+        assert(tracker:GetAlpha() == 1, "Instance exit did not restore section opacity")
+    end
+
     for _, command in ipairs({
         "help", "debug", "status", "diag", "test", "testcombat",
         "filterzone", "clearpending", "unknown",
