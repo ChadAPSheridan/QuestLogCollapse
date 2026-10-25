@@ -1,8 +1,8 @@
 -- QuestLogCollapse Configuration Panel
 -- Author: Gaspode
 -- Contributors: Artherion77 (significant ui revamp in 1.4.0)
--- Version: 1.5.9
--- Updated: 2026-10-24
+-- Version: 1.6.1
+-- Updated: 2026-10-25
 
 
 local addonName, ns = ...
@@ -14,93 +14,159 @@ local defaults = {
     enabled = true,
     debug = false,
     filterQuestsByZone = false,
-    filterQuestsByZoneMode = "openworld",  -- "openworld" | "always"
-    combat = {
+    filterQuestsByZoneMode = "openworld", -- "openworld" | "always"
+    defaultSettings = {
         enabled = false,
-        collapseQuests = false, collapseAchievements = false,
-        collapseBonusObjectives = false, collapseScenarios = false, collapseCampaigns = false,
-        collapseProfessions = false, collapseMonthlyActivities = false,
-        collapseUIWidgets = false, collapseAdventureMaps = false, collapseWorldQuests = false,
+        collapseQuests = false,
+        collapseAchievements = false,
+        collapseBonusObjectives = false,
+        collapseScenarios = false,
+        collapseCampaigns = false,
+        collapseProfessions = false,
+        collapseMonthlyActivities = false,
+        collapseUIWidgets = false,
+        collapseAdventureMaps = false,
+        collapseWorldQuests = false,
         namePlates = { enabled = false },
     },
     dungeons = {
         enabled = true,
-        collapseQuests = false, collapseAchievements = false,
-        collapseBonusObjectives = false, collapseScenarios = false, collapseCampaigns = true,
-        collapseProfessions = false, collapseMonthlyActivities = false,
-        collapseUIWidgets = false, collapseAdventureMaps = false, collapseWorldQuests = false,
+        collapseQuests = false,
+        collapseAchievements = false,
+        collapseBonusObjectives = false,
+        collapseScenarios = false,
+        collapseCampaigns = true,
+        collapseProfessions = false,
+        collapseMonthlyActivities = false,
+        collapseUIWidgets = false,
+        collapseAdventureMaps = false,
+        collapseWorldQuests = false,
         namePlates = { enabled = false },
     },
     raids = {
         enabled = true,
-        collapseQuests = false, collapseAchievements = false,
-        collapseBonusObjectives = false, collapseScenarios = false, collapseCampaigns = true,
-        collapseProfessions = false, collapseMonthlyActivities = false,
-        collapseUIWidgets = false, collapseAdventureMaps = false, collapseWorldQuests = false,
+        collapseQuests = false,
+        collapseAchievements = false,
+        collapseBonusObjectives = false,
+        collapseScenarios = false,
+        collapseCampaigns = true,
+        collapseProfessions = false,
+        collapseMonthlyActivities = false,
+        collapseUIWidgets = false,
+        collapseAdventureMaps = false,
+        collapseWorldQuests = false,
         namePlates = { enabled = false },
     },
     scenarios = {
         enabled = false,
-        collapseQuests = false, collapseAchievements = false,
-        collapseBonusObjectives = false, collapseScenarios = true, collapseCampaigns = false,
-        collapseProfessions = false, collapseMonthlyActivities = false,
-        collapseUIWidgets = false, collapseAdventureMaps = false, collapseWorldQuests = false,
+        collapseQuests = false,
+        collapseAchievements = false,
+        collapseBonusObjectives = false,
+        collapseScenarios = true,
+        collapseCampaigns = false,
+        collapseProfessions = false,
+        collapseMonthlyActivities = false,
+        collapseUIWidgets = false,
+        collapseAdventureMaps = false,
+        collapseWorldQuests = false,
         namePlates = { enabled = false },
     },
     battlegrounds = {
         enabled = false,
-        collapseQuests = false, collapseAchievements = false,
-        collapseBonusObjectives = false, collapseScenarios = false, collapseCampaigns = false,
-        collapseProfessions = false, collapseMonthlyActivities = false,
-        collapseUIWidgets = false, collapseAdventureMaps = false, collapseWorldQuests = false,
+        collapseQuests = false,
+        collapseAchievements = false,
+        collapseBonusObjectives = false,
+        collapseScenarios = false,
+        collapseCampaigns = false,
+        collapseProfessions = false,
+        collapseMonthlyActivities = false,
+        collapseUIWidgets = false,
+        collapseAdventureMaps = false,
+        collapseWorldQuests = false,
         namePlates = { enabled = false },
     },
     arenas = {
         enabled = false,
-        collapseQuests = false, collapseAchievements = false,
-        collapseBonusObjectives = false, collapseScenarios = false, collapseCampaigns = false,
-        collapseProfessions = false, collapseMonthlyActivities = false,
-        collapseUIWidgets = false, collapseAdventureMaps = false, collapseWorldQuests = false,
+        collapseQuests = false,
+        collapseAchievements = false,
+        collapseBonusObjectives = false,
+        collapseScenarios = false,
+        collapseCampaigns = false,
+        collapseProfessions = false,
+        collapseMonthlyActivities = false,
+        collapseUIWidgets = false,
+        collapseAdventureMaps = false,
+        collapseWorldQuests = false,
         namePlates = { enabled = false },
     },
     garrisons = {
         enabled = false,
-        collapseQuests = false, collapseAchievements = false,
-        collapseBonusObjectives = false, collapseScenarios = false, collapseCampaigns = false,
-        collapseProfessions = false, collapseMonthlyActivities = false,
-        collapseUIWidgets = false, collapseAdventureMaps = false, collapseWorldQuests = false,
+        collapseQuests = false,
+        collapseAchievements = false,
+        collapseBonusObjectives = false,
+        collapseScenarios = false,
+        collapseCampaigns = false,
+        collapseProfessions = false,
+        collapseMonthlyActivities = false,
+        collapseUIWidgets = false,
+        collapseAdventureMaps = false,
+        collapseWorldQuests = false,
         namePlates = { enabled = false },
     },
     classHalls = {
         enabled = false,
-        collapseQuests = false, collapseAchievements = false,
-        collapseBonusObjectives = false, collapseScenarios = false, collapseCampaigns = false,
-        collapseProfessions = false, collapseMonthlyActivities = false,
-        collapseUIWidgets = false, collapseAdventureMaps = false, collapseWorldQuests = false,
+        collapseQuests = false,
+        collapseAchievements = false,
+        collapseBonusObjectives = false,
+        collapseScenarios = false,
+        collapseCampaigns = false,
+        collapseProfessions = false,
+        collapseMonthlyActivities = false,
+        collapseUIWidgets = false,
+        collapseAdventureMaps = false,
+        collapseWorldQuests = false,
         namePlates = { enabled = false },
     },
     questTables = {
         enabled = false,
-        collapseQuests = false, collapseAchievements = false,
-        collapseBonusObjectives = false, collapseScenarios = false, collapseCampaigns = false,
-        collapseProfessions = false, collapseMonthlyActivities = false,
-        collapseUIWidgets = false, collapseAdventureMaps = false, collapseWorldQuests = false,
+        collapseQuests = false,
+        collapseAchievements = false,
+        collapseBonusObjectives = false,
+        collapseScenarios = false,
+        collapseCampaigns = false,
+        collapseProfessions = false,
+        collapseMonthlyActivities = false,
+        collapseUIWidgets = false,
+        collapseAdventureMaps = false,
+        collapseWorldQuests = false,
         namePlates = { enabled = false },
     },
     neighbourhood = {
         enabled = false,
-        collapseQuests = false, collapseAchievements = false,
-        collapseBonusObjectives = false, collapseScenarios = false, collapseCampaigns = false,
-        collapseProfessions = false, collapseMonthlyActivities = false,
-        collapseUIWidgets = false, collapseAdventureMaps = false, collapseWorldQuests = false,
+        collapseQuests = false,
+        collapseAchievements = false,
+        collapseBonusObjectives = false,
+        collapseScenarios = false,
+        collapseCampaigns = false,
+        collapseProfessions = false,
+        collapseMonthlyActivities = false,
+        collapseUIWidgets = false,
+        collapseAdventureMaps = false,
+        collapseWorldQuests = false,
         namePlates = { enabled = false },
     },
     house = {
         enabled = false,
-        collapseQuests = false, collapseAchievements = false,
-        collapseBonusObjectives = false, collapseScenarios = false, collapseCampaigns = false,
-        collapseProfessions = false, collapseMonthlyActivities = false,
-        collapseUIWidgets = false, collapseAdventureMaps = false, collapseWorldQuests = false,
+        collapseQuests = false,
+        collapseAchievements = false,
+        collapseBonusObjectives = false,
+        collapseScenarios = false,
+        collapseCampaigns = false,
+        collapseProfessions = false,
+        collapseMonthlyActivities = false,
+        collapseUIWidgets = false,
+        collapseAdventureMaps = false,
+        collapseWorldQuests = false,
         namePlates = { enabled = false },
     },
 }
@@ -162,6 +228,14 @@ local function InitializeConfigDB()
         ns.db.profiles[ns.charDB.currentProfile] = getDefaultProfile()
     end
 
+    -- Preserve the former Open World Combat settings as the profile defaults.
+    for _, profile in pairs(ns.db.profiles) do
+        if profile.defaultSettings == nil and type(profile.combat) == "table" then
+            profile.defaultSettings = profile.combat
+        end
+        profile.combat = nil
+    end
+
     -- Migrate old flat settings into the profile system
     for k in pairs(defaults) do
         if ns.db[k] ~= nil and ns.db.profiles["Default"][k] == nil then
@@ -177,7 +251,7 @@ end
 
 local function getProfile()
     if not ns.db or not ns.db.profiles
-       or not ns.charDB or not ns.charDB.currentProfile then
+        or not ns.charDB or not ns.charDB.currentProfile then
         return getDefaultProfile()
     end
     local profile = ns.db.profiles[ns.charDB.currentProfile]
@@ -207,55 +281,67 @@ end
 -- --------------------------------------------------------
 -- TRACKER SECTION DEFINITIONS  (used by all containers)
 -- --------------------------------------------------------
--- blacklistName matches the friendly name used in the runtime TAINT_BLACKLIST table
--- (see QuestLogCollapse.lua). When set and present in ns.TAINT_BLACKLIST at panel build,
--- the corresponding checkbox is disabled and visually marked so the user understands
--- the toggle is inert. Saved-vars values are left untouched.
-local SECTIONS_ROW1 = {
-    { key = "collapseQuests",
-      label = "Quests",
-      blacklistName = "Quest",
-      tip = "Collapse the Quest tracker (QuestObjectiveTracker).\nShows standard quests with objectives in your current area.\n|cffff9900Caution:|r Tracked quests with UIWidget content (e.g. delve coffer-key timers) taint Area POI tooltip widths. Off by default." },
-    { key = "collapseAchievements",
-      label = "Achievements",
-      tip = "Collapse the Achievement tracker.\nShows progress toward tracked achievement criteria." },
-    { key = "collapseBonusObjectives",
-      label = "Bonus",
-      blacklistName = "Bonus objectives",
-      tip = "Collapse the Bonus Objective tracker.\nShows area bonus objectives and rare encounters.\n|cffff9900Caution:|r Can cause taint on Area POI tooltips in some builds. Off by default." },
-    { key = "collapseCampaigns",
-      label = "Campaigns",
-      tip = "Collapse the Campaign Quest tracker.\nTracks story campaign and chapter quest chains." },
-    { key = "collapseScenarios",
-      label = "Scenario",
-      tip = "Collapse the Scenario/Dungeon objective tracker.\nShows dungeon and scenario step objectives." },
-}
-local SECTIONS_ROW2 = {
-    { key = "collapseWorldQuests",
-      label = "World Quests",
-      blacklistName = "World quest",
-      tip = "Collapse the World Quest tracker.\nShows world quests on the map.\n|cffff9900Caution:|r May cause world map system taint. Off by default." },
-    { key = "collapseProfessions",
-      label = "Professions",
-      tip = "Collapse the Profession Recipe tracker.\nShows active crafting work orders and profession recipes." },
-    { key = "collapseMonthlyActivities",
-      label = "Monthly",
-      blacklistName = "Monthly activities",
-      tip = "Collapse the Monthly Activities tracker.\nShows seasonal event and monthly quest progress bars.\n|cffff9900Caution:|r UIWidget status bars can cause taint. Off by default." },
-    { key = "collapseUIWidgets",
-      label = "Widgets",
-      blacklistName = "UI widgets",
-      tip = "Collapse the UI Widget objective tracker.\nShows general widget-based objectives.\n|cffff9900Caution:|r Directly manages widget pool frames — can cause taint. Off by default." },
-    { key = "collapseAdventureMaps",
-      label = "Adventure",
-      blacklistName = "Adventure map",
-      tip = "Collapse the Adventure Map Quest tracker.\nShows objectives from the adventure map.\n|cffff9900Caution:|r Can cause world map system taint. Off by default." },
-}
 
--- Returns true when the section's tracker is in the runtime TAINT_BLACKLIST.
-local function IsSectionBlacklisted(section)
-    return section.blacklistName and ns.TAINT_BLACKLIST and ns.TAINT_BLACKLIST[section.blacklistName] == true
-end
+local SECTIONS_ROW1  = {
+    {
+        key = "collapseQuests",
+        label = "Quests",
+        tip =
+        "Make the Quest tracker transparent (alpha 0).\nShows standard quests with objectives in your current area.\nLayout space and mouse interaction are unchanged."
+    },
+    {
+        key = "collapseAchievements",
+        label = "Achievements",
+        tip = "Make the Achievement tracker transparent (alpha 0).\nShows progress toward tracked achievement criteria.\nLayout space and mouse interaction are unchanged."
+    },
+    {
+        key = "collapseBonusObjectives",
+        label = "Bonus",
+        tip =
+        "Make the Bonus Objective tracker transparent (alpha 0).\nShows area bonus objectives and rare encounters.\nLayout space and mouse interaction are unchanged."
+    },
+    {
+        key = "collapseCampaigns",
+        label = "Campaigns",
+        tip = "Make the Campaign Quest tracker transparent (alpha 0).\nTracks story campaign and chapter quest chains.\nLayout space and mouse interaction are unchanged."
+    },
+    {
+        key = "collapseScenarios",
+        label = "Scenario",
+        tip = "Make the Scenario/Dungeon objective tracker transparent (alpha 0).\nShows dungeon and scenario step objectives.\nLayout space and mouse interaction are unchanged."
+    },
+}
+local SECTIONS_ROW2  = {
+    {
+        key = "collapseWorldQuests",
+        label = "World Quests",
+        tip =
+        "Make the World Quest tracker transparent (alpha 0).\nShows world quests on the map.\nLayout space and mouse interaction are unchanged."
+    },
+    {
+        key = "collapseProfessions",
+        label = "Professions",
+        tip = "Make the Profession Recipe tracker transparent (alpha 0).\nShows active crafting work orders and profession recipes.\nLayout space and mouse interaction are unchanged."
+    },
+    {
+        key = "collapseMonthlyActivities",
+        label = "Monthly",
+        tip =
+        "Make the Monthly Activities tracker transparent (alpha 0).\nShows seasonal event and monthly quest progress bars.\nLayout space and mouse interaction are unchanged."
+    },
+    {
+        key = "collapseUIWidgets",
+        label = "Widgets",
+        tip =
+        "Make the UI Widget objective tracker transparent (alpha 0).\nShows general widget-based objectives.\nLayout space and mouse interaction are unchanged."
+    },
+    {
+        key = "collapseAdventureMaps",
+        label = "Adventure",
+        tip =
+        "Make the Adventure Map Quest tracker transparent (alpha 0).\nShows objectives from the adventure map.\nLayout space and mouse interaction are unchanged."
+    },
+}
 
 local CONTAINER_H    = 107
 local CONTAINER_STEP = 112
@@ -320,39 +406,24 @@ local function BuildContainer(parent, instanceInfo, yTopLeft, isLegacy)
     typeEnabledCheck.key = instanceInfo.key
     Tip(typeEnabledCheck, "Activate for " .. instanceInfo.name,
         instanceInfo.contextTip or ("Apply these settings when you enter " .. instanceInfo.name .. "."),
-        "When unchecked, the addon will not collapse or expand any trackers in this context.")
+        instanceInfo.key == "defaultSettings"
+        and "When unchecked, default settings will not perform tracker changes."
+        or "When unchecked, Default Settings are used in this context.")
     typeEnabledCheck:SetScript("OnClick", function(self)
         getProfile()[self.key].enabled = self:GetChecked()
     end)
 
-    -- Build a single tracker checkbox row; gates blacklisted entries to inert + grayed.
     local function BuildSectionRow(sections, yOffset)
         for j, section in ipairs(sections) do
             local cb = CreateFrame("CheckButton", nil, container, "InterfaceOptionsCheckButtonTemplate")
             cb:SetPoint("TOPLEFT", container, "TOPLEFT", 5 + (j - 1) * 120, yOffset)
             cb.instanceKey = instanceInfo.key
             cb.sectionKey  = section.key
-            local blacklisted = IsSectionBlacklisted(section)
-            if blacklisted then
-                -- "(blacklisted)" suffix overflows the 120px column into adjacent
-                -- entries (see screenshot from 1.4.0-beta4). Use a small orange
-                -- asterisk instead and explain it in the tooltip.
-                cb.Text:SetText(section.label .. " |cffffaa00*|r")
-                cb:Disable()
-                cb:SetMotionScriptsWhileDisabled(true)  -- keep OnEnter/OnLeave firing for tooltip
-                cb.Text:SetTextColor(0.5, 0.5, 0.5)
-                Tip(cb, section.label .. " |cffffaa00*|r (blacklisted)",
-                    "|cffffaa00This tracker is in the runtime taint blacklist; the toggle has no effect.|r",
-                    "Reason: " .. (section.tip or ""),
-                    " ",
-                    "The |cffffaa00*|r in the label marks a blacklisted entry. The setting in your saved variables is left untouched, so removing the blacklist entry restores the toggle without losing your previous value.")
-            else
-                cb.Text:SetText(section.label)
-                Tip(cb, section.label, section.tip)
-                cb:SetScript("OnClick", function(self)
-                    getProfile()[self.instanceKey][self.sectionKey] = self:GetChecked()
-                end)
-            end
+            cb.Text:SetText(section.label)
+            Tip(cb, section.label, section.tip)
+            cb:SetScript("OnClick", function(self)
+                getProfile()[self.instanceKey][self.sectionKey] = self:GetChecked()
+            end)
             container[section.key] = cb
         end
     end
@@ -369,11 +440,13 @@ local function BuildContainer(parent, instanceInfo, yTopLeft, isLegacy)
     -- Nameplate toggle
     local namePlatesCheck = CreateFrame("CheckButton", nil, container, "InterfaceOptionsCheckButtonTemplate")
     namePlatesCheck:SetPoint("TOPLEFT", container, "TOPLEFT", 5, -79)
-    namePlatesCheck.Text:SetText("Show Enemy Name Plates")
+    namePlatesCheck.Text:SetText("Force Show Enemy Name Plates")
     namePlatesCheck.key = instanceInfo.key
-    Tip(namePlatesCheck, "Show Enemy Name Plates",
-        "Automatically enable enemy nameplates when entering " .. instanceInfo.name .. ".",
-        "Your original nameplate setting is restored when you leave.",
+    Tip(namePlatesCheck, "Force Show Enemy Name Plates",
+        instanceInfo.key == "defaultSettings"
+        and "Enable enemy nameplates when default settings are used."
+        or "Automatically enable enemy nameplates when entering " .. instanceInfo.name .. ".",
+        "Your original setting is restored when the current zone type does not request nameplates. If Enemy Name Plates are set to show in your Default Game Options, unchecking this will not hide them. If you manually toggle nameplates while in a zone, your choice is respected until you leave the zone.",
         "Controls the |cffffcc00nameplateShowEnemies|r game CVar.")
     namePlatesCheck:SetScript("OnClick", function(self)
         local prof = getProfile()
@@ -381,7 +454,7 @@ local function BuildContainer(parent, instanceInfo, yTopLeft, isLegacy)
         prof[self.key].namePlates.enabled = self:GetChecked()
     end)
 
-    container.enabledCheck          = typeEnabledCheck
+    container.enabledCheck           = typeEnabledCheck
     container.namePlatesEnabledCheck = namePlatesCheck
     return container
 end
@@ -389,55 +462,100 @@ end
 -- ============================================================
 -- INSTANCE TYPE DEFINITIONS
 -- ============================================================
-local combatType = {
-    { key = "combat", name = "Open World Combat", color = "|cffffff00",
-      contextTip = "Applied when you enter combat outside of any instance." },
+local defaultSettingsType = {
+    {
+        key = "defaultSettings",
+        name = "Default Settings",
+        color = "|cffffff00",
+        contextTip =
+        "Used when no instance-specific settings apply. These settings do not trigger any actions during combat."
+    },
 }
 local instanceTypes = {
-    { key = "dungeons",  name = "Dungeons",  color = "|cff00ff00",
-      contextTip = "Applied when you enter a 5-player dungeon (party instance)." },
-    { key = "raids",     name = "Raids",     color = "|cffff8000",
-      contextTip = "Applied when you enter a raid instance." },
-    { key = "scenarios", name = "Scenarios", color = "|cff0080ff",
-      contextTip = "Applied when you enter a scenario." },
+    {
+        key = "dungeons",
+        name = "Dungeons",
+        color = "|cff00ff00",
+        contextTip = "Applied when you enter a 5-player dungeon (party instance)."
+    },
+    {
+        key = "raids",
+        name = "Raids",
+        color = "|cffff8000",
+        contextTip = "Applied when you enter a raid instance."
+    },
+    {
+        key = "scenarios",
+        name = "Scenarios",
+        color = "|cff0080ff",
+        contextTip = "Applied when you enter a scenario."
+    },
 }
 local pvpTypes = {
-    { key = "battlegrounds", name = "Battlegrounds", color = "|cffff0080",
-      contextTip = "Applied when you enter a PvP battleground." },
-    { key = "arenas",        name = "Arenas",        color = "|cff8000ff",
-      contextTip = "Applied when you enter a PvP arena." },
+    {
+        key = "battlegrounds",
+        name = "Battlegrounds",
+        color = "|cffff0080",
+        contextTip = "Applied when you enter a PvP battleground."
+    },
+    {
+        key = "arenas",
+        name = "Arenas",
+        color = "|cff8000ff",
+        contextTip = "Applied when you enter a PvP arena."
+    },
 }
 local housingTypes = {
-    { key = "neighbourhood", name = "Neighbourhood", color = "|cff80ff80",
-      contextTip = "Applied in The War Within Neighbourhood areas." },
-    { key = "house",         name = "Player Housing", color = "|cffff80ff",
-      contextTip = "Applied inside your Player House." },
+    {
+        key = "neighbourhood",
+        name = "Neighbourhood",
+        color = "|cff80ff80",
+        contextTip = "Applied in The War Within Neighbourhood areas."
+    },
+    {
+        key = "house",
+        name = "Player Housing",
+        color = "|cffff80ff",
+        contextTip = "Applied inside your Player House."
+    },
 }
 local legacyTypes = {
-    { key = "garrisons",   name = "Garrisons",   color = "|cffffc000",
-      contextTip = "Applied inside a Warlords of Draenor Garrison." },
-    { key = "classHalls",  name = "Class Halls", color = "|cffff00ff",
-      contextTip = "Applied inside a Legion Class Hall." },
-    { key = "questTables", name = "Quest Tables", color = "|cffff8080",
-      contextTip = "Applied when at a garrison mission table." },
+    {
+        key = "garrisons",
+        name = "Garrisons",
+        color = "|cffffc000",
+        contextTip = "Applied inside a Warlords of Draenor Garrison."
+    },
+    {
+        key = "classHalls",
+        name = "Class Halls",
+        color = "|cffff00ff",
+        contextTip = "Applied inside a Legion Class Hall."
+    },
+    {
+        key = "questTables",
+        name = "Quest Tables",
+        color = "|cffff8080",
+        contextTip = "Applied when at a garrison mission table."
+    },
 }
 
 -- ============================================================
 -- SUB-PANEL FACTORY  (Instance Settings / PvP / Housing / Legacy)
 -- ============================================================
 local function BuildContainerPanel(titleText, typeList, isLegacyStyle)
-    local subPanel = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
+    local subPanel     = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
     subPanel.OnCommit  = function() end
     subPanel.OnDefault = function() end
     subPanel.OnRefresh = function() end
 
-    local titleLabel = subPanel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    local titleLabel   = subPanel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     titleLabel:SetPoint("TOP", subPanel, "TOP", 0, -20)
     titleLabel:SetText(titleText)
 
     local scrollFrame = CreateFrame("ScrollFrame", nil, subPanel, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetPoint("TOPLEFT",     subPanel, "TOPLEFT",     0,   -50)
-    scrollFrame:SetPoint("BOTTOMRIGHT", subPanel, "BOTTOMRIGHT", -25,   8)
+    scrollFrame:SetPoint("TOPLEFT", subPanel, "TOPLEFT", 0, -50)
+    scrollFrame:SetPoint("BOTTOMRIGHT", subPanel, "BOTTOMRIGHT", -25, 8)
 
     local scrollChild = CreateFrame("Frame", nil, scrollFrame)
     scrollChild:SetSize(600, 100)
@@ -472,9 +590,9 @@ local function BuildContainerPanel(titleText, typeList, isLegacyStyle)
 end
 
 -- ============================================================
--- BASIC OPTIONS PANEL  (parent category — global settings + open world combat)
+-- BASIC OPTIONS PANEL  (parent category — global settings + default settings)
 -- ============================================================
-local basicPanel  -- forward ref for SwitchProfile below
+local basicPanel -- forward ref for SwitchProfile below
 
 local function CreateBasicOptionsPanel()
     if basicPanel then return basicPanel end
@@ -485,8 +603,10 @@ local function CreateBasicOptionsPanel()
     if not ns.NewProfileDialog then
         ns.NewProfileDialog = {
             text = "Enter new profile name:",
-            button1 = "Create", button2 = "Cancel",
-            hasEditBox = true, maxLetters = 32,
+            button1 = "Create",
+            button2 = "Cancel",
+            hasEditBox = true,
+            maxLetters = 32,
             OnAccept = function(self)
                 local editBox = self.editBox or self.EditBox
                 local name = editBox and editBox:GetText():gsub("^%s+", ""):gsub("%s+$", "") or ""
@@ -500,13 +620,16 @@ local function CreateBasicOptionsPanel()
                 if refreshProfileDD then refreshProfileDD() end
                 print("|cff00ff00QuestLogCollapse|r Created profile: " .. name)
             end,
-            timeout = 0, whileDead = true, exclusive = true,
-            hideOnEscape = true, preferredIndex = 3,
+            timeout = 0,
+            whileDead = true,
+            exclusive = true,
+            hideOnEscape = true,
+            preferredIndex = 3,
         }
         StaticPopupDialogs["QUESTLOGCOLLAPSE_NEW_PROFILE"] = ns.NewProfileDialog
     end
 
-    basicPanel = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
+    basicPanel           = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
     basicPanel.name      = "QuestLogCollapse"
     basicPanel.OnCommit  = function() end
     basicPanel.OnDefault = function() end
@@ -515,7 +638,7 @@ local function CreateBasicOptionsPanel()
     -- --------------------------------------------------------
     -- TITLE
     -- --------------------------------------------------------
-    local titleLabel = basicPanel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    local titleLabel     = basicPanel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     titleLabel:SetPoint("TOP", basicPanel, "TOP", 0, -20)
     titleLabel:SetText("QuestLogCollapse — Basic Options")
 
@@ -534,8 +657,8 @@ local function CreateBasicOptionsPanel()
     -- SCROLL FRAME
     -- --------------------------------------------------------
     local scrollFrame = CreateFrame("ScrollFrame", nil, basicPanel, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetPoint("TOPLEFT",     basicPanel, "TOPLEFT",     0,   -50)
-    scrollFrame:SetPoint("BOTTOMRIGHT", basicPanel, "BOTTOMRIGHT", -25,  32)  -- leave room for debug
+    scrollFrame:SetPoint("TOPLEFT", basicPanel, "TOPLEFT", 0, -50)
+    scrollFrame:SetPoint("BOTTOMRIGHT", basicPanel, "BOTTOMRIGHT", -25, 32)  -- leave room for debug
 
     local scrollChild = CreateFrame("Frame", nil, scrollFrame)
     scrollChild:SetSize(600, 320)
@@ -577,7 +700,7 @@ local function CreateBasicOptionsPanel()
     enabledCheck.Text:SetText("Enable QuestLogCollapse")
     Tip(enabledCheck, "Enable QuestLogCollapse",
         "Master on/off switch for the entire addon.",
-        "When disabled, no trackers are collapsed or expanded and zone filtering does not run.",
+        "When disabled, no section alpha changes are applied and zone filtering does not run.",
         "Toggle with |cffffcc00/qlc toggle|r.")
 
     -- --------------------------------------------------------
@@ -620,7 +743,7 @@ local function CreateBasicOptionsPanel()
             }
             local currentMode = getProfile().filterQuestsByZoneMode or "openworld"
             for _, mode in ipairs(modes) do
-                local info = UIDropDownMenu_CreateInfo()
+                local info   = UIDropDownMenu_CreateInfo()
                 info.text    = mode.text
                 info.value   = mode.value
                 info.checked = (currentMode == mode.value)
@@ -636,20 +759,20 @@ local function CreateBasicOptionsPanel()
     InitFilterModeDD()
 
     -- --------------------------------------------------------
-    -- OPEN WORLD COMBAT SECTION
+    -- DEFAULT SETTINGS SECTION
     -- --------------------------------------------------------
     local sep2 = scrollChild:CreateTexture(nil, "BACKGROUND")
     sep2:SetPoint("TOPLEFT", filterQuestsByZoneCheck, "BOTTOMLEFT", 4, -10)
     sep2:SetSize(590, 1)
     sep2:SetColorTexture(0.5, 0.5, 0.5, 0.4)
 
-    local owcHeader = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    owcHeader:SetPoint("TOPLEFT", sep2, "BOTTOMLEFT", 0, -8)
-    owcHeader:SetText("OPEN WORLD COMBAT")
-    owcHeader:SetTextColor(0.6, 0.6, 0.6)
+    local defaultSettingsHeader = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    defaultSettingsHeader:SetPoint("TOPLEFT", sep2, "BOTTOMLEFT", 0, -8)
+    defaultSettingsHeader:SetText("DEFAULT SETTINGS")
+    defaultSettingsHeader:SetTextColor(0.6, 0.6, 0.6)
 
-    -- yTopLeft computed from: profile(~26) + sep1(1) + enable(26) + zfHeader(14) + filter(26) + sep2(1) + gap(8) + owcHeader(14) + gap(6) ≈ 163
-    local combatContainer = BuildContainer(scrollChild, combatType[1], -163, false)
+    -- yTopLeft computed from: profile(~26) + sep1(1) + enable(26) + zfHeader(14) + filter(26) + sep2(1) + gap(8) + header(14) + gap(6) ≈ 163
+    local defaultSettingsContainer = BuildContainer(scrollChild, defaultSettingsType[1], -163, false)
     scrollChild:SetHeight(163 + CONTAINER_H + 20)
 
     -- --------------------------------------------------------
@@ -665,7 +788,7 @@ local function CreateBasicOptionsPanel()
 
         UIDropDownMenu_Initialize(profileDD, function()
             for _, name in ipairs(items) do
-                local info = UIDropDownMenu_CreateInfo()
+                local info   = UIDropDownMenu_CreateInfo()
                 info.text    = name
                 info.checked = (name == ns.charDB.currentProfile)
                 info.func    = function()
@@ -678,7 +801,7 @@ local function CreateBasicOptionsPanel()
         UIDropDownMenu_SetSelectedValue(profileDD, ns.charDB.currentProfile)
     end
 
-    refreshProfileDD = RefreshQLCProfileDropdown  -- wire up the StaticPopup upvalue
+    refreshProfileDD = RefreshQLCProfileDropdown -- wire up the StaticPopup upvalue
 
     -- --------------------------------------------------------
     -- PANEL OnShow — refresh all widgets from current profile
@@ -691,7 +814,7 @@ local function CreateBasicOptionsPanel()
         filterQuestsByZoneCheck:SetChecked(prof.filterQuestsByZone or false)
         UIDropDownMenu_SetSelectedValue(filterModeDD, prof.filterQuestsByZoneMode or "openworld")
 
-        RefreshContainer(combatContainer, "combat", prof)
+        RefreshContainer(defaultSettingsContainer, "defaultSettings", prof)
         RefreshQLCProfileDropdown()
         InitFilterModeDD()
     end
@@ -743,14 +866,14 @@ configEventFrame:SetScript("OnEvent", function(self, event)
             -- Create all panels
             local basicOpts    = CreateBasicOptionsPanel()
             local instPanel    = BuildContainerPanel("Instances", instanceTypes, false)
-            local pvpPanel     = BuildContainerPanel("PvP",      pvpTypes,     false)
-            local housingPanel = BuildContainerPanel("Housing",   housingTypes, false)
-            local legacyPanel  = BuildContainerPanel("Legacy",    legacyTypes,  true)
+            local pvpPanel     = BuildContainerPanel("PvP", pvpTypes, false)
+            local housingPanel = BuildContainerPanel("Housing", housingTypes, false)
+            local legacyPanel  = BuildContainerPanel("Legacy", legacyTypes, true)
 
-            allPanels = { basicOpts, instPanel, pvpPanel, housingPanel, legacyPanel }
+            allPanels          = { basicOpts, instPanel, pvpPanel, housingPanel, legacyPanel }
 
             -- Register parent category (Basic Options)
-            local parentCat = Settings.RegisterCanvasLayoutCategory(basicOpts, "QuestLogCollapse")
+            local parentCat    = Settings.RegisterCanvasLayoutCategory(basicOpts, "QuestLogCollapse")
             Settings.RegisterAddOnCategory(parentCat)
             basicOpts.categoryID = parentCat.ID
 
@@ -760,10 +883,10 @@ configEventFrame:SetScript("OnEvent", function(self, event)
                 Settings.RegisterAddOnCategory(subCat)
                 subPanel.categoryID = subCat.ID
             end
-            RegSub(instPanel,    "Instances")
-            RegSub(pvpPanel,     "PvP")
+            RegSub(instPanel, "Instances")
+            RegSub(pvpPanel, "PvP")
             RegSub(housingPanel, "Housing")
-            RegSub(legacyPanel,  "Legacy")
+            RegSub(legacyPanel, "Legacy")
 
             panelRegistered = true
         end
@@ -782,24 +905,39 @@ local function GetCurrentInstanceSettings()
     if ns.DebugPrint then
         ns.DebugPrint("Current instance type: " .. tostring(instanceType))
     end
+    local settings
     if instanceType == "party" then
-        local isInGarrison  = C_Garrison.IsPlayerInGarrison(Enum.GarrisonType.Type_6_0_Garrison)
-        local isInClassHall = C_Garrison.IsPlayerInGarrison(Enum.GarrisonType.Type_7_0_Garrison)
+        local isInGarrison   = C_Garrison.IsPlayerInGarrison(Enum.GarrisonType.Type_6_0_Garrison)
+        local isInClassHall  = C_Garrison.IsPlayerInGarrison(Enum.GarrisonType.Type_7_0_Garrison)
         local isAtQuestTable = C_Garrison.IsAtGarrisonMissionNPC() or
-                               C_Garrison.IsPlayerInGarrison(Enum.GarrisonType.Type_8_0_Garrison)
-        if isInGarrison      then return prof.garrisons
-        elseif isInClassHall then return prof.classHalls
-        elseif isAtQuestTable then return prof.questTables
-        else                      return prof.dungeons
+            C_Garrison.IsPlayerInGarrison(Enum.GarrisonType.Type_8_0_Garrison)
+        if isInGarrison then
+            settings = prof.garrisons
+        elseif isInClassHall then
+            settings = prof.classHalls
+        elseif isAtQuestTable then
+            settings = prof.questTables
+        else
+            settings = prof.dungeons
         end
-    elseif instanceType == "raid"         then return prof.raids
-    elseif instanceType == "scenario"     then return prof.scenarios
-    elseif instanceType == "pvp"          then return prof.battlegrounds
-    elseif instanceType == "arena"        then return prof.arenas
-    elseif instanceType == "neighborhood" then return prof.neighbourhood
-    elseif instanceType == "interior"     then return prof.house
-    else                                       return prof.combat
+    elseif instanceType == "raid" then
+        settings = prof.raids
+    elseif instanceType == "scenario" then
+        settings = prof.scenarios
+    elseif instanceType == "pvp" then
+        settings = prof.battlegrounds
+    elseif instanceType == "arena" then
+        settings = prof.arenas
+    elseif instanceType == "neighborhood" then
+        settings = prof.neighbourhood
+    elseif instanceType == "interior" then
+        settings = prof.house
     end
+
+    if settings and settings.enabled then
+        return settings
+    end
+    return prof.defaultSettings
 end
 
 local function GetCurrentQLCProfile()

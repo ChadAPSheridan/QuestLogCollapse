@@ -1,8 +1,8 @@
--- QuestLogCollapse: Automatically collapses quest log when entering dungeons
+-- QuestLogCollapse: Automatically fades quest tracker sections when entering instances
 -- Author: Gaspode
 -- Contributors: Artherion77
--- Version: 1.5.9
--- Updated: 2026-10-24
+-- Version: 1.6.1
+-- Updated: 2026-10-25
 
 -- TAINT PROTECTION STRATEGY:
 -- Implemented namespace to avoid global variable pollution
@@ -10,46 +10,19 @@
 
 -- Use addon namespace to prevent global variable pollution and taint
 local addonName, ns = ...
-local ADDON_VERSION = "1.5.9"
+local ADDON_VERSION = "1.6.1"
 
 -- Create addon frame (local to prevent global pollution)
 local QuestLogCollapse = CreateFrame("Frame")
 QuestLogCollapse:RegisterEvent("ADDON_LOADED")
 QuestLogCollapse:RegisterEvent("ZONE_CHANGED_NEW_AREA")
-QuestLogCollapse:RegisterEvent("PLAYER_REGEN_DISABLED")
+-- Combat start is intentionally not handled; combat does not trigger automatic tracker changes.
 QuestLogCollapse:RegisterEvent("PLAYER_REGEN_ENABLED")
 QuestLogCollapse:RegisterEvent("PLAYER_ENTERING_WORLD")
 QuestLogCollapse:RegisterEvent("PLAYER_STARTED_MOVING")
 QuestLogCollapse:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
 QuestLogCollapse:RegisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
 
-
--- Keys here are the 'name' strings passed to SafeCollapseTracker/SafeExpandTracker.
-local TAINT_BLACKLIST = {
-    ["UI widgets"]          = true,  -- Causes taint when collapsing/expanding due to Blizzard's secure widget handling
-    ["Monthly activities"]  = false,
-    ["Adventure map"]      = false,
-    ["World quest"]        = false,
-    ["Bonus objectives"]   = false,
-    ["Quest"]              = false,
-    ["Achievement"]        = false,
-    ["Scenario"]           = true,
-    ["Campaign"]           = false,
-    ["Professions"]        = false,
-}
-
--- Helper function to check if a value is tainted
-local function IsTainted(value)
-    if type(value) == "number" then
-        -- Try to use the number in a protected operation
-        local success = securecall(function()
-            local _ = value + 0
-            return true
-        end)
-        return not success
-    end
-    return false
-end
 
 -- Taint-safe deferral logic
 local mapSystemBusy = false
@@ -58,30 +31,33 @@ local pendingOperations = {}
 
 -- Shared tracker definitions used by all tracker operations.
 local TRACKER_DEFS = {
-    { name = "Quest",              label = "Quests",             settingKey = "collapseQuests",            supportsImmediate = true,  getter = function() return QuestObjectiveTracker end },
-    { name = "Achievement",        label = "Achievements",       settingKey = "collapseAchievements",      supportsImmediate = true,  getter = function() return AchievementObjectiveTracker end },
-    { name = "Bonus objectives",   label = "Bonus Objectives",   settingKey = "collapseBonusObjectives",   supportsImmediate = true,  getter = function() return BonusObjectiveTracker end },
-    { name = "Scenario",           label = "Scenarios",          settingKey = "collapseScenarios",         supportsImmediate = false, getter = function() return ScenarioObjectiveTracker end },
-    { name = "Campaign",           label = "Campaigns",          settingKey = "collapseCampaigns",         supportsImmediate = true,  getter = function() return CampaignQuestObjectiveTracker end },
-    { name = "Professions",        label = "Professions",        settingKey = "collapseProfessions",       supportsImmediate = false, getter = function() return ProfessionsRecipeTracker end },
-    { name = "Monthly activities", label = "Monthly Activities", settingKey = "collapseMonthlyActivities", supportsImmediate = false, getter = function() return MonthlyActivitiesObjectiveTracker end },
-    { name = "UI widgets",         label = "UI Widgets",         settingKey = "collapseUIWidgets",         supportsImmediate = false, getter = function() return UIWidgetObjectiveTracker end },
-    { name = "Adventure map",      label = "Adventure Maps",     settingKey = "collapseAdventureMaps",     supportsImmediate = false, getter = function() return _G["AdventureMapQuestObjectiveTracker"] end },
-    { name = "World quest",        label = "World Quests",       settingKey = "collapseWorldQuests",       supportsImmediate = true,  getter = function() return WorldQuestObjectiveTracker end },
+    { name = "Quest",              label = "Quests",             settingKey = "collapseQuests",            supportsImmediate = true, getter = function() return
+        QuestObjectiveTracker end },
+    { name = "Achievement",        label = "Achievements",       settingKey = "collapseAchievements",      supportsImmediate = true, getter = function() return
+        AchievementObjectiveTracker end },
+    { name = "Bonus objectives",   label = "Bonus Objectives",   settingKey = "collapseBonusObjectives",   supportsImmediate = true, getter = function() return
+        BonusObjectiveTracker end },
+    { name = "Scenario",           label = "Scenarios",          settingKey = "collapseScenarios",         supportsImmediate = true, getter = function() return
+        ScenarioObjectiveTracker end },
+    { name = "Campaign",           label = "Campaigns",          settingKey = "collapseCampaigns",         supportsImmediate = true, getter = function() return
+        CampaignQuestObjectiveTracker end },
+    { name = "Professions",        label = "Professions",        settingKey = "collapseProfessions",       supportsImmediate = true, getter = function() return
+        ProfessionsRecipeTracker end },
+    { name = "Monthly activities", label = "Monthly Activities", settingKey = "collapseMonthlyActivities", supportsImmediate = true, getter = function() return
+        MonthlyActivitiesObjectiveTracker end },
+    { name = "UI widgets",         label = "UI Widgets",         settingKey = "collapseUIWidgets",         supportsImmediate = true, getter = function() return
+        UIWidgetObjectiveTracker end },
+    { name = "Adventure map",      label = "Adventure Maps",     settingKey = "collapseAdventureMaps",     supportsImmediate = true, getter = function() return
+        _G["AdventureMapQuestObjectiveTracker"] end },
+    { name = "World quest",        label = "World Quests",       settingKey = "collapseWorldQuests",       supportsImmediate = true, getter = function() return
+        WorldQuestObjectiveTracker end },
 }
 local TRACKER_DEF_BY_NAME = {}
 for _, def in ipairs(TRACKER_DEFS) do
     TRACKER_DEF_BY_NAME[def.name] = def
 end
 
-local function IsScenarioTracker(tracker, name)
-    return name == "Scenario" or tracker == ScenarioObjectiveTracker
-end
-
 local function QueuePendingOperation(trackerName, action)
-    if trackerName == "Scenario" then
-        return
-    end
     pendingOperations[trackerName] = { action = action, trackerName = trackerName }
 end
 
@@ -111,9 +87,7 @@ local isFullyLoaded = false
 -- Track combat state for delayed operations
 local combatStateQueue = {
     shouldCollapseOnCombatEnd = false,
-    shouldExpandOnCombatEnd = false,
-    enteredCombatOutsideInstance = false,
-    trackersWereCollapsedInCombat = false
+    shouldExpandOnCombatEnd = false
 }
 
 -- Track nameplate state to restore properly
@@ -124,7 +98,7 @@ local namePlateState = {
 
 -- Track quest tracking state to restore properly
 local questTrackingState = {
-    originalTrackedQuests = {}, -- Store original tracked quest IDs
+    originalTrackedQuests = {},   -- Store original tracked quest IDs
     addonModifiedTracking = false -- Whether the addon has modified quest tracking
 }
 
@@ -158,17 +132,30 @@ local function GetLegacyDefaults()
     return LEGACY_DEFAULTS
 end
 
+MyAddonDB = MyAddonDB or { logs = {} }
+
+local function LogMessage(msg)
+    local timestamp = date("%H:%M:%S")
+    table.insert(MyAddonDB.logs, "[" .. timestamp .. "] " .. msg)
+
+    -- Optional: Keep the log from growing infinitely large
+    if #MyAddonDB.logs > 500 then
+        table.remove(MyAddonDB.logs, 1)
+    end
+end
+
+ns.LogMessage = LogMessage
+
 -- Debug print function (stored in namespace)
 local function DebugPrint(message)
     local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or ns.db
     if profile and profile.debug then
         print("|cff00ff00[QuestLogCollapse]|r " .. message)
+        LogMessage(message)
     end
 end
 -- Make DebugPrint available to other addon files via namespace
 ns.DebugPrint = DebugPrint
--- Expose taint blacklist so the config UI can gate toggles for trackers we refuse to collapse
-ns.TAINT_BLACKLIST = TAINT_BLACKLIST
 
 local function IsInDungeon()
     local instanceType = select(2, IsInInstance())
@@ -176,41 +163,53 @@ local function IsInDungeon()
         instanceType == "arena" or instanceType == "neighborhood" or instanceType == "interior"
 end
 
--- Safe function to collapse a tracker using secure methods
-local function SafeCollapseTracker(tracker, name, shouldCollapse, forceAllowInCombat)
+local function UpdateNamePlates()
+    if InCombatLockdown() then
+        DebugPrint("Skipping nameplate update - in combat")
+        return
+    end
+
+    local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or ns.db
+    local settings = ns.GetCurrentInstanceSettings and ns.GetCurrentInstanceSettings()
+    local shouldShow = profile and profile.enabled and settings and settings.enabled
+        and settings.namePlates and settings.namePlates.enabled
+
+    if shouldShow then
+        if not namePlateState.addonControlled then
+            namePlateState.originalShowAll = GetCVar("nameplateShowEnemies")
+            namePlateState.addonControlled = true
+            DebugPrint("Stored original ENEMY nameplate state: " .. tostring(namePlateState.originalShowAll))
+        end
+        if GetCVar("nameplateShowEnemies") ~= "1" then
+            SetCVar("nameplateShowEnemies", "1")
+        end
+        DebugPrint("Enabled ENEMY nameplates for current zone settings")
+    elseif namePlateState.addonControlled then
+        local originalState = namePlateState.originalShowAll or "0"
+        SetCVar("nameplateShowEnemies", originalState)
+        DebugPrint("Restored original ENEMY nameplate state: " .. tostring(originalState))
+        namePlateState.addonControlled = false
+        namePlateState.originalShowAll = nil
+    end
+end
+ns.UpdateNamePlates = UpdateNamePlates
+
+-- Keep legacy operation names and saved settings; only change visual alpha.
+local function SafeCollapseTracker(tracker, name, shouldCollapse)
     if not isFullyLoaded or not tracker or not shouldCollapse then
+        DebugPrint(name .. " not found, not fully loaded, or shouldCollapse is false")
         return false
     end
 
-    if IsScenarioTracker(tracker, name) then
-        DebugPrint("Skipping Scenario tracker (taint-prone secure path)")
-        return false
-    end
-
-    -- Allow collapse during combat only if explicitly forced (for dungeon/instance entry)
-    -- or if not in combat. Outside instances, never collapse during combat to avoid taint.
-    local blockDueToCombat = InCombatLockdown() and not forceAllowInCombat
-    if blockDueToCombat then
-        DebugPrint("Skipping " .. name .. " collapse - in combat")
-        return false
-    end
-
-    -- Skip blacklisted trackers that cause taint
-    if TAINT_BLACKLIST[name] then
-        DebugPrint("Skipping " .. name .. " collapse - blacklisted (causes UI taint)")
-        return false
-    end
-
-    -- Also check by tracker object reference
-    local trackerName = tracker and tracker:GetName()
-    if trackerName and TAINT_BLACKLIST[trackerName] then
-        DebugPrint("Skipping " .. name .. " collapse - blacklisted by object name (" .. trackerName .. ")")
+    -- NEVER manipulate trackers during combat to avoid taint
+    if InCombatLockdown() then
+        DebugPrint("Skipping " .. name .. " transparency - in combat")
         return false
     end
 
     -- Avoid operations when map system might be busy
     if mapSystemBusy then
-        DebugPrint("Deferring " .. name .. " collapse - map system busy")
+        DebugPrint("Deferring " .. name .. " transparency - map system busy")
         QueuePendingOperation(name, "collapse")
         return true
     end
@@ -221,44 +220,20 @@ local function SafeCollapseTracker(tracker, name, shouldCollapse, forceAllowInCo
         return true
     end
 
-    -- Use secure execution with frame script for other trackers
-    local success = false
-
-    -- Wrap in error handler to catch and suppress taint errors
-    if tracker.SetCollapsed and type(tracker.SetCollapsed) == "function" then
-        local executeFrame = CreateFrame("Frame")
-        executeFrame:SetScript("OnUpdate", function(self)
-            self:SetScript("OnUpdate", nil)
-
-            if InCombatLockdown() then
-                DebugPrint("Combat started, aborting " .. name .. " collapse")
-                return
-            end
-
-            local ok = securecall(function()
-                if tracker and tracker.SetCollapsed then
-                    tracker:SetCollapsed(true)
-                end
-            end)
-
-            if ok then
-                DebugPrint(name .. " section collapsed successfully")
-                success = true
-            else
-                DebugPrint("Warning: Taint detected when collapsing " .. name .. " (securecall blocked)")
-                TAINT_BLACKLIST[name] = true
-            end
-        end)
+    if type(tracker.SetAlpha) == "function" then
+        tracker:SetAlpha(0)
+        DebugPrint(name .. " section made transparent")
+        return true
     end
 
-    return true
+    DebugPrint(name .. " section has no SetAlpha method")
+    return false
 end
 
 local function CollapseQuestLog()
-    -- Allow collapse during combat ONLY in dungeons/instances
-    -- Outside instances, skip during combat to avoid taint
-    if InCombatLockdown() and not IsInDungeon() then
-        DebugPrint("CollapseQuestLog() skipped - in combat outside instance")
+    -- NEVER do anything during combat to avoid taint
+    if InCombatLockdown() then
+        DebugPrint("CollapseQuestLog() skipped - in combat")
         return
     end
 
@@ -273,80 +248,40 @@ local function CollapseQuestLog()
     end
 
     if not settings.enabled then
-        DebugPrint("Instance type not enabled for collapsing")
+        DebugPrint("Instance type not enabled for transparency")
         return
     end
 
-    DebugPrint("Instance settings found and enabled, proceeding with collapse")
+    DebugPrint("Instance settings found and enabled, applying transparency")
 
-    -- When in dungeon during combat, allow collapse immediately
-    local forceAllowInCombat = IsInDungeon() and InCombatLockdown()
 
     local collapsed = 0
 
     for _, def in ipairs(TRACKER_DEFS) do
-        if SafeCollapseTracker(def.getter(), def.name, settings[def.settingKey], forceAllowInCombat) then
+        if SafeCollapseTracker(def.getter(), def.name, settings[def.settingKey]) then
             collapsed = collapsed + 1
         end
     end
 
-    DebugPrint("Collapsed " .. collapsed .. " sections")
-
-    -- Handle nameplate settings (only if not in combat)
-    if settings.namePlates and settings.namePlates.enabled and not InCombatLockdown() then
-        DebugPrint("Enabling ENEMY nameplates for instance")
-        -- Store original state before changing it (only if we haven't already)
-        if not namePlateState.addonControlled then
-            namePlateState.originalShowAll = GetCVar("nameplateShowEnemies")
-            DebugPrint("Stored original ENEMY nameplate state: " .. tostring(namePlateState.originalShowAll))
-            -- Debug: Show current state of all nameplate CVars
-            DebugPrint("Before change - nameplateShowAll: " .. tostring(GetCVar("nameplateShowAll")))
-            DebugPrint("Before change - nameplateShowEnemies: " .. tostring(GetCVar("nameplateShowEnemies")))
-            DebugPrint("Before change - nameplateShowFriends: " .. tostring(GetCVar("nameplateShowFriends")))
-        end
-        namePlateState.addonControlled = true
-        SetCVar("nameplateShowEnemies", "1")
-        -- Debug: Show state after change
-        DebugPrint("After change - nameplateShowAll: " .. tostring(GetCVar("nameplateShowAll")))
-        DebugPrint("After change - nameplateShowEnemies: " .. tostring(GetCVar("nameplateShowEnemies")))
-        DebugPrint("After change - nameplateShowFriends: " .. tostring(GetCVar("nameplateShowFriends")))
-    end
+    DebugPrint("Made " .. collapsed .. " sections transparent")
 end
 
--- Safe function to expand a tracker using secure methods
+-- Restore section opacity without touching Blizzard's collapsed state or layout.
 local function SafeExpandTracker(tracker, name)
     if not isFullyLoaded or not tracker then
         DebugPrint(name .. " not found or not fully loaded")
         return false
     end
 
-    if IsScenarioTracker(tracker, name) then
-        DebugPrint("Skipping Scenario tracker (taint-prone secure path)")
-        return false
-    end
-
     -- NEVER manipulate trackers during combat to avoid taint
     if InCombatLockdown() then
-        DebugPrint("Skipping " .. name .. " expand - in combat")
-        return false
-    end
-
-    -- Skip blacklisted trackers that cause taint
-    if TAINT_BLACKLIST[name] then
-        DebugPrint("Skipping " .. name .. " expand - blacklisted (causes UI taint)")
-        return false
-    end
-
-    -- Also check by tracker object reference
-    local trackerName = tracker and tracker:GetName()
-    if trackerName and TAINT_BLACKLIST[trackerName] then
-        DebugPrint("Skipping " .. name .. " expand - blacklisted by object name (" .. trackerName .. ")")
+        DebugPrint("Skipping " .. name .. " opacity restoration - in combat")
         return false
     end
 
     -- Avoid operations when map system might be busy
     if mapSystemBusy then
-        DebugPrint("Deferring " .. name .. " expand - map system busy")
+        DebugPrint("Deferring " .. name .. " opacity restoration - map system busy")
         QueuePendingOperation(name, "expand")
         return true
     end
@@ -357,37 +292,14 @@ local function SafeExpandTracker(tracker, name)
         return true
     end
 
-    -- Use secure execution with frame script
-    local success = false
-
-    -- Wrap in error handler to catch and suppress taint errors
-    if tracker.SetCollapsed and type(tracker.SetCollapsed) == "function" then
-        local executeFrame = CreateFrame("Frame")
-        executeFrame:SetScript("OnUpdate", function(self)
-            self:SetScript("OnUpdate", nil)
-
-            if InCombatLockdown() then
-                DebugPrint("Combat started, aborting " .. name .. " expand")
-                return
-            end
-
-            local ok = securecall(function()
-                if tracker and tracker.SetCollapsed then
-                    tracker:SetCollapsed(false)
-                end
-            end)
-
-            if ok then
-                DebugPrint(name .. " section expanded successfully")
-                success = true
-            else
-                DebugPrint("Warning: Taint detected when expanding " .. name .. " (securecall blocked)")
-                TAINT_BLACKLIST[name] = true
-            end
-        end)
+    if type(tracker.SetAlpha) == "function" then
+        tracker:SetAlpha(1)
+        DebugPrint(name .. " section made opaque")
+        return true
     end
 
-    return true
+    DebugPrint(name .. " section has no SetAlpha method")
+    return false
 end
 
 function ns.ProcessPendingOperations()
@@ -417,8 +329,7 @@ local function ExpandQuestLog()
         return
     end
 
-    -- When leaving an instance, expand all sections regardless of settings
-    -- This ensures we restore the original state
+    -- When leaving an instance, restore opacity for all sections.
 
     DebugPrint("ExpandQuestLog() called")
     local expanded = 0
@@ -428,27 +339,7 @@ local function ExpandQuestLog()
             expanded = expanded + 1
         end
     end
-
-    DebugPrint("Expanded " .. expanded .. " sections/modules")
-
-    -- Restore nameplate settings (only if the addon was controlling them)
-    if namePlateState.addonControlled and not InCombatLockdown() then
-        DebugPrint("Restoring original ENEMY nameplate state: " .. tostring(namePlateState.originalShowAll))
-        -- Debug: Show current state before restoration
-        DebugPrint("Before restore - nameplateShowAll: " .. tostring(GetCVar("nameplateShowAll")))
-        DebugPrint("Before restore - nameplateShowEnemies: " .. tostring(GetCVar("nameplateShowEnemies")))
-        DebugPrint("Before restore - nameplateShowFriends: " .. tostring(GetCVar("nameplateShowFriends")))
-
-        SetCVar("nameplateShowEnemies", namePlateState.originalShowAll or "0")
-
-        -- Debug: Show state after restoration
-        DebugPrint("After restore - nameplateShowAll: " .. tostring(GetCVar("nameplateShowAll")))
-        DebugPrint("After restore - nameplateShowEnemies: " .. tostring(GetCVar("nameplateShowEnemies")))
-        DebugPrint("After restore - nameplateShowFriends: " .. tostring(GetCVar("nameplateShowFriends")))
-
-        namePlateState.addonControlled = false
-        namePlateState.originalShowAll = nil
-    end
+    DebugPrint("Made " .. expanded .. " sections/modules opaque")
 end
 
 -- Filter quests by current zone
@@ -466,7 +357,7 @@ local function FilterQuestsByZone()
 
     local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or ns.db
     if not profile or not profile.filterQuestsByZone then
-        needsZoneFilter = false  -- Clear the flag
+        needsZoneFilter = false -- Clear the flag
         return
     end
 
@@ -514,7 +405,8 @@ local function FilterQuestsByZone()
             local isOnCurrentMap = questInfo and questInfo.isOnMap
             local hasLocalMarker = questInfo and questInfo.hasLocalPOI
 
-            DebugPrint("  Quest " .. questID .. ": isOnMap=" .. tostring(isOnCurrentMap) .. ", hasLocalPOI=" .. tostring(hasLocalMarker))
+            DebugPrint("  Quest " ..
+            questID .. ": isOnMap=" .. tostring(isOnCurrentMap) .. ", hasLocalPOI=" .. tostring(hasLocalMarker))
 
             if isOnCurrentMap or hasLocalMarker then
                 return true, "has objectives/markers in current zone"
@@ -584,7 +476,8 @@ local function FilterQuestsByZone()
             if info and not info.isHeader and not info.isHidden then
                 local questID = info.questID
                 if questID then
-                    DebugPrint("Checking quest log entry " .. i .. ": questID=" .. questID .. ", title='" .. (info.title or "unknown") .. "'")
+                    DebugPrint("Checking quest log entry " ..
+                    i .. ": questID=" .. questID .. ", title='" .. (info.title or "unknown") .. "'")
 
                     if trackedQuestIDs[questID] then
                         DebugPrint("  Quest " .. questID .. " already tracked, skipping")
@@ -608,8 +501,10 @@ local function FilterQuestsByZone()
             end
         end
 
-        DebugPrint("=== Step 2 complete: newly tracked " .. tracked .. ", skipped (already tracked) " .. skipped .. " ===")
-        DebugPrint("=== FINAL: kept " .. kept .. ", untracked " .. untracked .. ", newly tracked " .. tracked .. " quests ===")
+        DebugPrint("=== Step 2 complete: newly tracked " ..
+        tracked .. ", skipped (already tracked) " .. skipped .. " ===")
+        DebugPrint("=== FINAL: kept " ..
+        kept .. ", untracked " .. untracked .. ", newly tracked " .. tracked .. " quests ===")
     end)
 end
 
@@ -642,6 +537,8 @@ end
 local function OnZoneChanged()
     local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or ns.db
 
+    UpdateNamePlates()
+
     -- Set flag for zone filtering - will be triggered by user action (map open, movement, etc.)
     -- We can't call FilterQuestsByZone() directly here because it would cause taint
     if profile and profile.filterQuestsByZone then
@@ -651,7 +548,7 @@ local function OnZoneChanged()
     end
 
     if not profile or not profile.enabled then
-        DebugPrint("Addon disabled or no profile found (skipping collapse/expand)")
+        DebugPrint("Addon disabled or no profile found (skipping alpha changes)")
         return
     end
 
@@ -663,13 +560,13 @@ local function OnZoneChanged()
         DebugPrint("Instance check: inInstance=" .. tostring(inInstance) .. ", type=" .. tostring(instanceType))
 
         if IsInDungeon() then
-            DebugPrint("Entered instance - collapsing configured sections")
+            DebugPrint("Entered instance - making configured sections transparent")
             CollapseQuestLog()
         else
-            DebugPrint("Left instance - expanding all collapsed sections")
+            DebugPrint("Left instance - restoring section opacity")
             ExpandQuestLog()
         end
-    end, true)  -- Allow callback during dungeon combat
+    end, true) -- Allow callback during dungeon combat
 end
 
 local function OnAddonLoaded(loadedAddonName)
@@ -687,13 +584,13 @@ local function OnAddonLoaded(loadedAddonName)
     end
 
     print("|cff00ff00QuestLogCollapse|r v" .. ADDON_VERSION .. " loaded. Type |cffff0000/qlc config|r for options.")
-    print("|cffff9900[QuestLogCollapse]|r Note: Some trackers (Quests, Bonus Objectives, World Quests) are disabled by default to prevent UI taint. Enable at your own risk.")
 
     RunWhenAddonReady("Initial state check", 40, 1, function()
+        UpdateNamePlates()
         if IsInDungeon() then
             local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or ns.db
             if profile and profile.enabled and not InCombatLockdown() then
-                DebugPrint("Initial state check: in dungeon, applying collapse")
+                DebugPrint("Initial state check: in dungeon, applying transparency")
                 CollapseQuestLog()
             end
         end
@@ -707,108 +604,25 @@ local function OnCombatStateChanged(event)
         return
     end
 
-    -- Allow dungeon collapse regardless of combat state - dungeons need to collapse immediately
-    local inDungeon = IsInDungeon()
+    if event == "PLAYER_REGEN_ENABLED" then
+        DebugPrint("Leaving combat - checking queued operations and quest log state")
 
-    if not inDungeon then
-        if event == "PLAYER_REGEN_DISABLED" then
-            -- Check if combat collapse is enabled
-            local settings = ns.GetCurrentInstanceSettings and ns.GetCurrentInstanceSettings()
-            if settings and settings.enabled then
-                DebugPrint("PLAYER_REGEN_DISABLED fired - attempting immediate collapse")
-
-                local collapsed = 0
-
-                -- Attempt immediate collapse of each enabled tracker
-                -- Trackers in TAINT_BLACKLIST are skipped here too, mirroring SafeCollapseTracker.
-                -- Without this gate, the immediate path bypasses the blacklist on collapse while
-                -- SafeExpandTracker still honors it on expand, leaving blacklisted trackers stuck
-                -- collapsed forever. See TAINT_BLACKLIST comments for the underlying taint chains.
-                for _, def in ipairs(TRACKER_DEFS) do
-                    local wanted = def.supportsImmediate and settings[def.settingKey]
-                    local tracker = def.getter()
-                    local name = def.name
-                    if wanted and tracker then
-                        if TAINT_BLACKLIST[name] then
-                            DebugPrint("Skipping " .. name .. " immediate collapse - blacklisted (causes UI taint)")
-                        else
-                            local ok = securecall(function()
-                                if tracker.SetCollapsed then
-                                    tracker:SetCollapsed(true)
-                                    collapsed = collapsed + 1
-                                end
-                            end)
-                            if ok then
-                                DebugPrint(name .. " tracker immediately collapsed in combat")
-                            else
-                                DebugPrint("Failed to immediately collapse " .. name .. " tracker (securecall blocked due to potential taint)")
-                            end
-                        end
-                    end
-                end
-
-                if collapsed > 0 then
-                    DebugPrint("Successfully collapsed " .. collapsed .. " trackers immediately in combat")
-                    -- Mark that we successfully collapsed and need to expand on combat end
-                    combatStateQueue.enteredCombatOutsideInstance = true
-                    combatStateQueue.shouldCollapseOnCombatEnd = false
-                    combatStateQueue.shouldExpandOnCombatEnd = false
-                    combatStateQueue.trackersWereCollapsedInCombat = true
-                else
-                    DebugPrint("No trackers could be collapsed immediately - queuing for after combat")
-                    -- Queue the operation for after combat ends
-                    combatStateQueue.enteredCombatOutsideInstance = true
-                    combatStateQueue.shouldCollapseOnCombatEnd = true
-                    combatStateQueue.shouldExpandOnCombatEnd = false
-                    combatStateQueue.trackersWereCollapsedInCombat = false
-                    DebugPrint("Queuing remaining collapse operations for when combat ends")
-                end
-            else
-                DebugPrint("Combat collapse not enabled for this profile")
-                -- Still mark that we entered combat outside instance in case user manually interacts
-                combatStateQueue.enteredCombatOutsideInstance = true
-                combatStateQueue.shouldCollapseOnCombatEnd = false
-                combatStateQueue.shouldExpandOnCombatEnd = false
-            end
-        elseif event == "PLAYER_REGEN_ENABLED" then
-            DebugPrint("Leaving combat - checking queued operations and quest log state")
-
-            if combatStateQueue.enteredCombatOutsideInstance and combatStateQueue.shouldCollapseOnCombatEnd then
-                DebugPrint("Applying queued collapse operation after combat")
-                CollapseQuestLog()
-                combatStateQueue.shouldCollapseOnCombatEnd = false
-                combatStateQueue.trackersWereCollapsedInCombat = true
-            elseif combatStateQueue.shouldExpandOnCombatEnd then
-                DebugPrint("Applying queued expand operation after combat")
-                ExpandQuestLog()
-                combatStateQueue.shouldExpandOnCombatEnd = false
-            elseif combatStateQueue.enteredCombatOutsideInstance and combatStateQueue.trackersWereCollapsedInCombat then
-                -- If we were in combat outside instances and trackers were collapsed,
-                -- expand the quest log when combat ends to restore original state
-                local settings = ns.GetCurrentInstanceSettings and ns.GetCurrentInstanceSettings()
-                if settings and settings.enabled then
-                    DebugPrint("Combat ended outside instance - expanding quest log to restore original state")
-                    ExpandQuestLog()
-                else
-                    DebugPrint("Combat collapse not enabled - no expansion needed")
-                end
-            elseif combatStateQueue.enteredCombatOutsideInstance then
-                DebugPrint("Combat ended outside instance but no trackers were collapsed - no expansion needed")
-            end
-
-            -- Reset combat tracking
-            combatStateQueue.enteredCombatOutsideInstance = false
-            combatStateQueue.trackersWereCollapsedInCombat = false
-
-        end
-    else
-        -- In dungeon/instance - allow collapse regardless of combat state
-        if event == "PLAYER_REGEN_DISABLED" then
-            DebugPrint("Entered combat IN DUNGEON - applying immediate collapse")
+        if combatStateQueue.enteredCombatOutsideInstance and combatStateQueue.shouldCollapseOnCombatEnd then
+            DebugPrint("Applying queued transparency after combat")
             CollapseQuestLog()
-        elseif event == "PLAYER_REGEN_ENABLED" then
-            DebugPrint("Left combat in dungeon - staying collapsed (in instance)")
+            combatStateQueue.shouldCollapseOnCombatEnd = false
+            combatStateQueue.trackersWereCollapsedInCombat = true
+        elseif combatStateQueue.shouldExpandOnCombatEnd then
+            DebugPrint("Applying queued opacity restoration after combat")
+            ExpandQuestLog()
+            combatStateQueue.shouldExpandOnCombatEnd = false
+        elseif combatStateQueue.enteredCombatOutsideInstance then
+            DebugPrint("Combat ended outside instance with no queued alpha changes")
         end
+
+        -- Reset combat tracking
+        combatStateQueue.enteredCombatOutsideInstance = false
+        combatStateQueue.trackersWereCollapsedInCombat = false
     end
 end
 
@@ -827,9 +641,10 @@ QuestLogCollapse:SetScript("OnEvent", function(self, event, ...)
     elseif event == "ZONE_CHANGED_NEW_AREA" then
         SetMapSystemBusy(8)
         OnZoneChanged()
-    elseif event == "PLAYER_REGEN_DISABLED" or event == "PLAYER_REGEN_ENABLED" then
+    elseif event == "PLAYER_REGEN_ENABLED" then
         -- Handle combat options
         OnCombatStateChanged(event)
+        UpdateNamePlates()
     elseif event == "PLAYER_STARTED_MOVING" then
         -- Player movement - check for pending zone filter
         -- This is typically hardware-initiated (WASD keys)
@@ -885,20 +700,18 @@ function ns.HandleSlashCommand(msg)
         print("|cffff0000/qlc toggle|r - Toggle addon on/off")
         print("|cffff0000/qlc debug|r - Toggle debug messages")
         print("|cffff0000/qlc status|r - Show current status and combat queue")
-        print("|cffff0000/qlc collapse|r - Manually collapse configured sections")
-        print("|cffff0000/qlc expand|r - Manually expand all collapsed sections")
+        print("|cffff0000/qlc collapse|r - Make configured sections transparent (alpha 0)")
+        print("|cffff0000/qlc expand|r - Restore all section opacity (alpha 1)")
         print("|cffff0000/qlc filterzone|r - Filter quests by current zone (manual)")
         print("|cffff0000/qlc diag|r - Show concise diagnostic summary")
         print("|cffff0000/qlc test|r - Test objective tracker detection")
-        print("|cffff0000/qlc testcombat|r - Test combat collapse behavior")
+        print("|cffff0000/qlc testcombat|r - Test current settings (legacy command name)")
         print("|cffff0000/qlc clearpending|r - Clear pending tracker operations")
         print("|cffff0000/qlc config|r - Open configuration panel")
         print("")
-        print("|cff00ff00Combat Behavior:|r")
-        print("• Quest trackers collapse on PLAYER_REGEN_DISABLED (combat start)")
-        print("• Trackers in the runtime taint blacklist are skipped")
-        print("• Quest trackers automatically expand when combat ends (outside instances)")
-        print("• If immediate collapse fails, operations are queued for when combat ends")
+        print("|cff00ff00Combat Safety:|r")
+        print("• Automatic tracker changes are not triggered by combat")
+        print("• Manual tracker operations requested during combat are deferred until combat ends")
         print("• Use |cffff0000/qlc expand|r during combat to cancel queued operations")
         print("")
         print("|cff00ff00Zone Filtering:|r")
@@ -961,15 +774,14 @@ function ns.HandleSlashCommand(msg)
         local settings = ns.GetCurrentInstanceSettings and ns.GetCurrentInstanceSettings()
         if settings then
             local instanceType = select(2, IsInInstance())
-        print("Current Instance Settings (" .. (instanceType or "none") .. "):")
-        print("  Instance Type Enabled: " .. (settings.enabled and "Yes" or "No"))
+            print("Current Instance Settings (" .. (instanceType or "none") .. "):")
+            print("  Instance Type Enabled: " .. (settings.enabled and "Yes" or "No"))
         end
 
         print("|cff00ff00Combat Queue Status:|r")
         print("  Entered Combat Outside Instance: " .. (combatStateQueue.enteredCombatOutsideInstance and "Yes" or "No"))
-        print("  Collapse Queued: " .. (combatStateQueue.shouldCollapseOnCombatEnd and "Yes" or "No"))
-        print("  Expand Queued: " .. (combatStateQueue.shouldExpandOnCombatEnd and "Yes" or "No"))
-        print("  Trackers Collapsed in Combat: " .. (combatStateQueue.trackersWereCollapsedInCombat and "Yes" or "No"))
+        print("  Transparency Queued: " .. (combatStateQueue.shouldCollapseOnCombatEnd and "Yes" or "No"))
+        print("  Opacity Restoration Queued: " .. (combatStateQueue.shouldExpandOnCombatEnd and "Yes" or "No"))
 
         print("|cff00ff00Nameplate Status:|r")
         print("  Addon Controlled: " .. (namePlateState.addonControlled and "Yes" or "No"))
@@ -982,7 +794,7 @@ function ns.HandleSlashCommand(msg)
         for _, def in ipairs(TRACKER_DEFS) do
             local tracker = def.getter()
             if tracker then
-                print(def.label .. ": " .. (tracker.collapsed and "Collapsed" or "Expanded"))
+                print(def.label .. ": alpha " .. tostring(tracker:GetAlpha()))
             end
         end
     elseif args[1] == "diag" then
@@ -991,15 +803,9 @@ function ns.HandleSlashCommand(msg)
         local settings = ns.GetCurrentInstanceSettings and ns.GetCurrentInstanceSettings()
         local inInstance, instanceType = IsInInstance()
         local pendingCount = 0
-        local blacklisted = {}
 
         for _ in pairs(pendingOperations) do
             pendingCount = pendingCount + 1
-        end
-        for _, def in ipairs(TRACKER_DEFS) do
-            if TAINT_BLACKLIST[def.name] then
-                table.insert(blacklisted, def.label)
-            end
         end
 
         print("|cff00ff00QuestLogCollapse Diagnostics:|r")
@@ -1011,16 +817,16 @@ function ns.HandleSlashCommand(msg)
         print("Pending operations: " .. tostring(pendingCount))
         print("Zone filter pending: " .. (needsZoneFilter and "Yes" or "No"))
         print("Last zone filter trigger: " .. tostring(lastZoneFilterTrigger))
-        print("Blacklisted trackers: " .. (#blacklisted > 0 and table.concat(blacklisted, ", ") or "None"))
+        print("Tracker mode: section alpha (0 = transparent, 1 = opaque); layout unchanged")
         if settings then
-            print("Configured collapses in current context:")
+            print("Configured transparent sections in current context:")
             for _, def in ipairs(TRACKER_DEFS) do
                 print("  " .. def.label .. ": " .. (settings[def.settingKey] and "Yes" or "No"))
             end
         end
     elseif args[1] == "collapse" then
         if InCombatLockdown() then
-            print("|cff00ff00QuestLogCollapse|r Cannot collapse during combat - will apply when combat ends")
+            print("|cff00ff00QuestLogCollapse|r Cannot change section alpha during combat - will apply when combat ends")
             -- Queue the operation if we're outside dungeons
             if not IsInDungeon() then
                 combatStateQueue.shouldCollapseOnCombatEnd = true
@@ -1028,17 +834,17 @@ function ns.HandleSlashCommand(msg)
             end
         else
             CollapseQuestLog()
-            print("|cff00ff00QuestLogCollapse|r manually collapsed configured sections")
+            print("|cff00ff00QuestLogCollapse|r requested alpha 0 for configured sections (layout unchanged)")
         end
     elseif args[1] == "expand" then
         if InCombatLockdown() then
-            print("|cff00ff00QuestLogCollapse|r Cannot expand during combat - canceling any queued operations")
+            print("|cff00ff00QuestLogCollapse|r Cannot change section alpha during combat - opacity restoration queued")
             -- Cancel any queued operations and clear combat state
             combatStateQueue.shouldCollapseOnCombatEnd = false
             combatStateQueue.shouldExpandOnCombatEnd = true
         else
             ExpandQuestLog()
-            print("|cff00ff00QuestLogCollapse|r manually expanded all collapsed sections")
+            print("|cff00ff00QuestLogCollapse|r requested alpha 1 for all sections")
         end
     elseif args[1] == "filterzone" then
         -- Manual zone filter trigger (always safe from slash command)
@@ -1073,16 +879,15 @@ function ns.HandleSlashCommand(msg)
         end
         print("|cff00ff00Combat Queue Status:|r")
         print("  Entered Combat Outside Instance: " .. (combatStateQueue.enteredCombatOutsideInstance and "Yes" or "No"))
-        print("  Collapse Queued: " .. (combatStateQueue.shouldCollapseOnCombatEnd and "Yes" or "No"))
-        print("  Expand Queued: " .. (combatStateQueue.shouldExpandOnCombatEnd and "Yes" or "No"))
-        print("  Trackers Collapsed in Combat: " .. (combatStateQueue.trackersWereCollapsedInCombat and "Yes" or "No"))
+        print("  Transparency Queued: " .. (combatStateQueue.shouldCollapseOnCombatEnd and "Yes" or "No"))
+        print("  Opacity Restoration Queued: " .. (combatStateQueue.shouldExpandOnCombatEnd and "Yes" or "No"))
     elseif args[1] == "testcombat" then
-        print("|cff00ff00QuestLogCollapse Combat Test:|r")
+        print("|cff00ff00QuestLogCollapse Current Settings Test:|r")
         local settings = ns.GetCurrentInstanceSettings and ns.GetCurrentInstanceSettings()
         if settings then
-            print("Combat Settings Found: " .. (settings.enabled and "Enabled" or "Disabled"))
+            print("Current Settings Found: " .. (settings.enabled and "Enabled" or "Disabled"))
             if settings.enabled then
-                print("Combat Collapse Sections:")
+                print("Configured Transparent Sections:")
                 print("  Quests: " .. (settings.collapseQuests and "Yes" or "No"))
                 print("  Achievements: " .. (settings.collapseAchievements and "Yes" or "No"))
                 print("  Bonus Objectives: " .. (settings.collapseBonusObjectives and "Yes" or "No"))
@@ -1096,7 +901,7 @@ function ns.HandleSlashCommand(msg)
                 print("  Nameplate Control: " .. (settings.namePlates and settings.namePlates.enabled and "Yes" or "No"))
             end
         else
-            print("No combat settings found")
+            print("No settings found")
         end
         print("Current Combat State: " .. (InCombatLockdown() and "In Combat" or "Not in Combat"))
         print("Current Instance State: " .. (IsInDungeon() and "In Instance" or "Outside Instance"))
@@ -1173,9 +978,9 @@ end)
 local function FindTrackerMinimizeButton()
     local OT = ObjectiveTrackerFrame
     if not OT then return nil end
-    if OT.Header     and OT.Header.MinimizeButton     then return OT.Header.MinimizeButton     end
+    if OT.Header and OT.Header.MinimizeButton then return OT.Header.MinimizeButton end
     if OT.HeaderMenu and OT.HeaderMenu.MinimizeButton then return OT.HeaderMenu.MinimizeButton end
-    if OT.MinimizeButton                              then return OT.MinimizeButton            end
+    if OT.MinimizeButton then return OT.MinimizeButton end
     return nil
 end
 
