@@ -25,6 +25,7 @@ profiles and `collapse*` setting keys remain compatible; `/qlc collapse` and
 - **Nameplate Integration**: Optional nameplate management for different instance types
 - **Debug Mode**: Optional debug messages to track addon behavior
 - **Manual Control**: Commands to set configured sections to alpha 0 or restore all sections to alpha 1
+- **Show/Hide Button**: The on-screen `QLC Show/Hide` button toggles all available tracker sections, regardless of section settings
 - **No Native Collapse Calls**: Alpha changes avoid the native collapse/expand update path; this is not a guarantee against all Blizzard taint bugs
 - **Lightweight**: Minimal performance impact with efficient event handling
 
@@ -40,6 +41,11 @@ profiles and `collapse*` setting keys remain compatible; `/qlc collapse` and
 ## Commands
 
 The addon provides several slash commands for basic control:
+
+The `QLC Show/Hide` button near the upper-right of the screen hides all available
+tracker sections or restores their opacity. It remains visible when sections
+are transparent. Button actions requested in combat are applied after combat;
+layout space remains reserved.
 
 - `/qlc` or `/questlogcollapse` - Show help menu
 - `/qlc config` - Open the configuration panel (recommended)
@@ -193,6 +199,7 @@ Run `lua5.1 tests/namespace.lua` from the repository root to check namespace
 isolation, saved-variable identity, settings registration, and deferred operations
 with a mocked WoW environment. The checks also cover per-section alpha values,
 Scenario support, unchanged native collapsed state, and combat/map deferral.
+Run `lua5.1 tests/button.lua` to check the standalone show/hide button and its queue.
 
 ## Compatibility
 

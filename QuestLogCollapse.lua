@@ -87,7 +87,8 @@ local isFullyLoaded = false
 -- Track combat state for delayed operations
 local combatStateQueue = {
     shouldCollapseOnCombatEnd = false,
-    shouldExpandOnCombatEnd = false
+    shouldExpandOnCombatEnd = false,
+    shouldHideAllOnCombatEnd = false,
 }
 
 -- Track nameplate state to restore properly
@@ -396,6 +397,13 @@ local function ExpandQuestLog()
     DebugPrint("Made " .. expanded .. " sections/modules opaque")
 end
 
+local function HideAllTrackers()
+    for _, def in ipairs(TRACKER_DEFS) do
+        pendingOperations[def.name] = nil
+        SafeCollapseTracker(def.getter(), def.name, true)
+    end
+end
+
 -- Filter quests by current zone
 -- This function is only safe to call from:
 -- 1. Slash commands (user-initiated)
@@ -660,18 +668,12 @@ local function OnCombatStateChanged(event)
         end
         UpdateTransparentMouse()
         ns.ProcessPendingOperations()
-    end
-
-    local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or ns.db
-    if not profile or not profile.enabled then
-        DebugPrint("Addon disabled or no profile found")
-        return
-    end
-
-    if event == "PLAYER_REGEN_ENABLED" then
         DebugPrint("Leaving combat - checking queued operations and quest log state")
 
-        if combatStateQueue.shouldCollapseOnCombatEnd then
+        if combatStateQueue.shouldHideAllOnCombatEnd then
+            HideAllTrackers()
+            combatStateQueue.shouldHideAllOnCombatEnd = false
+        elseif combatStateQueue.shouldCollapseOnCombatEnd then
             DebugPrint("Applying queued transparency after combat")
             CollapseQuestLog()
             combatStateQueue.shouldCollapseOnCombatEnd = false
@@ -681,6 +683,11 @@ local function OnCombatStateChanged(event)
             combatStateQueue.shouldExpandOnCombatEnd = false
         end
     elseif event == "PLAYER_REGEN_DISABLED" then
+        local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or ns.db
+        if not profile or not profile.enabled then
+            DebugPrint("Addon disabled or no profile found")
+            return
+        end
         DebugPrint("Entering combat - triggering alpha and mouse interaction changes if needed")
         CollapseQuestLog(combatChangedTrackers)
     end
@@ -842,6 +849,7 @@ function ns.HandleSlashCommand(msg)
 
         print("|cff00ff00Combat Queue Status:|r")
         print("  Transparency Queued: " .. (combatStateQueue.shouldCollapseOnCombatEnd and "Yes" or "No"))
+        print("  Hide All Queued: " .. (combatStateQueue.shouldHideAllOnCombatEnd and "Yes" or "No"))
         print("  Opacity Restoration Queued: " .. (combatStateQueue.shouldExpandOnCombatEnd and "Yes" or "No"))
 
         print("|cff00ff00Nameplate Status:|r")
@@ -890,6 +898,7 @@ function ns.HandleSlashCommand(msg)
             print("|cff00ff00QuestLogCollapse|r Cannot change section alpha during combat - will apply when combat ends")
             combatStateQueue.shouldCollapseOnCombatEnd = true
             combatStateQueue.shouldExpandOnCombatEnd = false
+            combatStateQueue.shouldHideAllOnCombatEnd = false
         else
             CollapseQuestLog()
             print("|cff00ff00QuestLogCollapse|r requested alpha 0 for configured sections (layout unchanged)")
@@ -900,6 +909,7 @@ function ns.HandleSlashCommand(msg)
             -- Cancel any queued operations and clear combat state
             combatStateQueue.shouldCollapseOnCombatEnd = false
             combatStateQueue.shouldExpandOnCombatEnd = true
+            combatStateQueue.shouldHideAllOnCombatEnd = false
         else
             ExpandQuestLog()
             print("|cff00ff00QuestLogCollapse|r requested alpha 1 for all sections")
@@ -937,6 +947,7 @@ function ns.HandleSlashCommand(msg)
         end
         print("|cff00ff00Combat Queue Status:|r")
         print("  Transparency Queued: " .. (combatStateQueue.shouldCollapseOnCombatEnd and "Yes" or "No"))
+        print("  Hide All Queued: " .. (combatStateQueue.shouldHideAllOnCombatEnd and "Yes" or "No"))
         print("  Opacity Restoration Queued: " .. (combatStateQueue.shouldExpandOnCombatEnd and "Yes" or "No"))
     elseif args[1] == "testcombat" then
         print("|cff00ff00QuestLogCollapse Current Settings Test:|r")
@@ -982,6 +993,55 @@ function ns.HandleSlashCommand(msg)
         print("|cff00ff00QuestLogCollapse|r Unknown command. Type |cffff0000/qlc help|r for available commands.")
     end
 end
+
+local toggleButton = CreateFrame("Button", nil, UIParent, "UIPanelButtonTemplate")
+toggleButton:SetSize(110, 22)
+toggleButton:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -280, -180)
+toggleButton:SetText("QLC Show/Hide")
+toggleButton:SetScript("OnClick", function()
+    if not isFullyLoaded then
+        print("|cff00ff00QuestLogCollapse|r Tracker is not ready yet")
+        return
+    end
+
+    local available = false
+    for _, def in ipairs(TRACKER_DEFS) do
+        if def.getter() then
+            available = true
+            break
+        end
+    end
+    if not available then
+        print("|cff00ff00QuestLogCollapse|r No tracker sections are available")
+        return
+    end
+
+    local shouldShow
+    if combatStateQueue.shouldHideAllOnCombatEnd or combatStateQueue.shouldCollapseOnCombatEnd then
+        shouldShow = true
+    elseif combatStateQueue.shouldExpandOnCombatEnd then
+        shouldShow = false
+    else
+        shouldShow = next(transparentTrackers) ~= nil
+        for _, operation in pairs(pendingOperations) do
+            if operation.action == "expand" then
+                shouldShow = false
+                break
+            end
+        end
+    end
+
+    if InCombatLockdown() then
+        combatStateQueue.shouldCollapseOnCombatEnd = false
+        combatStateQueue.shouldHideAllOnCombatEnd = not shouldShow
+        combatStateQueue.shouldExpandOnCombatEnd = shouldShow
+        print("|cff00ff00QuestLogCollapse|r Section visibility change queued until combat ends")
+    elseif shouldShow then
+        ExpandQuestLog()
+    else
+        HideAllTrackers()
+    end
+end)
 
 -- WoW discovers slash commands through these global registrations.
 _G.SLASH_QUESTLOGCOLLAPSE1 = "/qlc"
