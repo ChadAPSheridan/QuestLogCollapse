@@ -6,6 +6,7 @@ local function run(savedDB, savedCharDB)
     local allowedGlobals = {
         QuestLogCollapseDB = true,
         QuestLogCollapseCharDB = true,
+        MyAddonDB = true,
         SLASH_QUESTLOGCOLLAPSE1 = true,
         SLASH_QUESTLOGCOLLAPSE2 = true,
     }
@@ -29,6 +30,7 @@ local function run(savedDB, savedCharDB)
         end,
     })
     globals._G = env
+    globals.date = os.date
 
     local methods = {}
     for _, name in ipairs({
@@ -39,7 +41,7 @@ local function run(savedDB, savedCharDB)
         methods[name] = function() end
     end
     local function widget()
-        return setmetatable({ scripts = {}, events = {}, shown = true }, { __index = methods })
+        return setmetatable({ scripts = {}, events = {}, shown = true, children = {}, regions = {} }, { __index = methods })
     end
     function methods:SetScript(event, callback) self.scripts[event] = callback end
     function methods:HookScript(event, callback)
@@ -61,6 +63,14 @@ local function run(savedDB, savedCharDB)
     function methods:IsShown() return self.shown end
     function methods:SetAlpha(alpha) self.alpha = alpha end
     function methods:GetAlpha() return self.alpha or 1 end
+    function methods:GetChildren() return unpack(self.children) end
+    function methods:GetRegions() return unpack(self.regions) end
+    function methods:IsMouseClickEnabled() return self.mouseClick or false end
+    function methods:IsMouseMotionEnabled() return self.mouseMotion or false end
+    function methods:IsMouseWheelEnabled() return self.mouseWheel or false end
+    function methods:SetMouseClickEnabled(enabled) assert(not inCombat); self.mouseClick = enabled end
+    function methods:SetMouseMotionEnabled(enabled) assert(not inCombat); self.mouseMotion = enabled end
+    function methods:EnableMouseWheel(enabled) assert(not inCombat); self.mouseWheel = enabled end
     function methods:Hide() self.shown = false end
     function methods:Show()
         if self.shown then return end
@@ -130,6 +140,12 @@ local function run(savedDB, savedCharDB)
         globals[name] = tracker
     end
     globals.ObjectiveTrackerFrame = widget()
+    local header, child, text = widget(), widget(), widget()
+    header.mouseClick, header.mouseMotion = true, true
+    child.mouseClick, child.mouseWheel = true, true
+    text.mouseMotion = true
+    globals.QuestObjectiveTracker.children = { header, child }
+    child.regions = { text }
 
     local function event(name, ...)
         for _, frame in ipairs(frames) do
@@ -232,6 +248,25 @@ local function run(savedDB, savedCharDB)
         assert(tracker.isCollapsed == true, "Native collapsed state changed")
         assert(tracker:IsShown(), "Transparency must not hide the frame")
     end
+    assert(not header.mouseClick and not header.mouseMotion, "Header remains interactive")
+    assert(not child.mouseClick and not child.mouseWheel, "Child remains interactive")
+    assert(not text.mouseMotion, "Nested region remains interactive")
+    local dynamic = widget()
+    dynamic.mouseClick, dynamic.mouseMotion = true, true
+    child.children = { dynamic }
+    update()
+    assert(not dynamic.mouseClick and not dynamic.mouseMotion, "New child remains interactive")
+    child.children = {}
+    update()
+    assert(dynamic.mouseClick and dynamic.mouseMotion, "Reparented child was not restored")
+    child.children = { dynamic }
+    update()
+    assert(not dynamic.mouseClick, "Reused child remains interactive")
+    dynamic.mouseWheel = true
+    update()
+    assert(not dynamic.mouseWheel, "Re-enabled mouse input was not suppressed")
+    ns.HandleSlashCommand("collapse")
+    assert(not header.mouseClick, "Repeated transparency re-enabled input")
     assert(globals.ObjectiveTrackerFrame:GetAlpha() == 1, "Whole tracker was made transparent")
     ns.HandleSlashCommand("expand")
     update()
@@ -239,17 +274,33 @@ local function run(savedDB, savedCharDB)
         assert(tracker:GetAlpha() == 1, "Section opacity was not restored")
         assert(tracker.isCollapsed == true, "Native collapsed state changed on restoration")
     end
+    assert(header.mouseClick and header.mouseMotion, "Header mouse state was not restored")
+    assert(child.mouseClick and child.mouseWheel and not child.mouseMotion, "Child mouse state was not restored")
+    assert(text.mouseMotion and not text.mouseClick, "Region mouse state was not restored")
+    assert(dynamic.mouseClick and dynamic.mouseMotion and dynamic.mouseWheel, "Dynamic child mouse state was not restored")
     defaultSettings.collapseScenarios = false
     ns.HandleSlashCommand("collapse")
     assert(globals.ScenarioObjectiveTracker:GetAlpha() == 1, "Unselected section was changed")
     assert(globals.QuestObjectiveTracker:GetAlpha() == 0, "Selected section was not made transparent")
     inCombat = true
+    local combatChild = widget()
+    combatChild.mouseClick = true
+    child.children = { dynamic, combatChild }
+    update()
+    assert(combatChild.mouseClick, "Mouse input changed during combat")
+    inCombat = false
+    update()
+    assert(not combatChild.mouseClick, "Combat-created child was not suppressed after combat")
+    inCombat = true
     ns.HandleSlashCommand("expand")
     assert(globals.QuestObjectiveTracker:GetAlpha() == 0, "Alpha changed during combat")
+    update()
+    assert(not header.mouseClick, "Mouse state changed during combat")
     inCombat = false
     event("PLAYER_REGEN_ENABLED")
     update()
     assert(globals.QuestObjectiveTracker:GetAlpha() == 1, "Combat-deferred opacity was not restored")
+    assert(combatChild.mouseClick, "Combat-created child mouse state was not restored")
 
     instanceType = "party"
     dungeonSettings.enabled, dungeonSettings.collapseCampaigns = true, true

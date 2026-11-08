@@ -1,8 +1,8 @@
 -- QuestLogCollapse Configuration Panel
 -- Author: Gaspode
 -- Contributors: Artherion77 (significant ui revamp in 1.4.0)
--- Version: 1.6.1
--- Updated: 2026-10-25
+-- Version: 1.6.2
+-- Updated: 2026-11-06
 
 
 local addonName, ns = ...
@@ -287,28 +287,28 @@ local SECTIONS_ROW1  = {
         key = "collapseQuests",
         label = "Quests",
         tip =
-        "Make the Quest tracker transparent (alpha 0).\nShows standard quests with objectives in your current area.\nLayout space and mouse interaction are unchanged."
+        "Make the Quest tracker transparent (alpha 0).\nShows standard quests with objectives in your current area.\nLayout space remains; mouse input is disabled outside combat."
     },
     {
         key = "collapseAchievements",
         label = "Achievements",
-        tip = "Make the Achievement tracker transparent (alpha 0).\nShows progress toward tracked achievement criteria.\nLayout space and mouse interaction are unchanged."
+        tip = "Make the Achievement tracker transparent (alpha 0).\nShows progress toward tracked achievement criteria.\nLayout space remains; mouse input is disabled outside combat."
     },
     {
         key = "collapseBonusObjectives",
         label = "Bonus",
         tip =
-        "Make the Bonus Objective tracker transparent (alpha 0).\nShows area bonus objectives and rare encounters.\nLayout space and mouse interaction are unchanged."
+        "Make the Bonus Objective tracker transparent (alpha 0).\nShows area bonus objectives and rare encounters.\nLayout space remains; mouse input is disabled outside combat."
     },
     {
         key = "collapseCampaigns",
         label = "Campaigns",
-        tip = "Make the Campaign Quest tracker transparent (alpha 0).\nTracks story campaign and chapter quest chains.\nLayout space and mouse interaction are unchanged."
+        tip = "Make the Campaign Quest tracker transparent (alpha 0).\nTracks story campaign and chapter quest chains.\nLayout space remains; mouse input is disabled outside combat."
     },
     {
         key = "collapseScenarios",
         label = "Scenario",
-        tip = "Make the Scenario/Dungeon objective tracker transparent (alpha 0).\nShows dungeon and scenario step objectives.\nLayout space and mouse interaction are unchanged."
+        tip = "Make the Scenario/Dungeon objective tracker transparent (alpha 0).\nShows dungeon and scenario step objectives.\nLayout space remains; mouse input is disabled outside combat."
     },
 }
 local SECTIONS_ROW2  = {
@@ -316,30 +316,30 @@ local SECTIONS_ROW2  = {
         key = "collapseWorldQuests",
         label = "World Quests",
         tip =
-        "Make the World Quest tracker transparent (alpha 0).\nShows world quests on the map.\nLayout space and mouse interaction are unchanged."
+        "Make the World Quest tracker transparent (alpha 0).\nShows world quests on the map.\nLayout space remains; mouse input is disabled outside combat."
     },
     {
         key = "collapseProfessions",
         label = "Professions",
-        tip = "Make the Profession Recipe tracker transparent (alpha 0).\nShows active crafting work orders and profession recipes.\nLayout space and mouse interaction are unchanged."
+        tip = "Make the Profession Recipe tracker transparent (alpha 0).\nShows active crafting work orders and profession recipes.\nLayout space remains; mouse input is disabled outside combat."
     },
     {
         key = "collapseMonthlyActivities",
         label = "Monthly",
         tip =
-        "Make the Monthly Activities tracker transparent (alpha 0).\nShows seasonal event and monthly quest progress bars.\nLayout space and mouse interaction are unchanged."
+        "Make the Monthly Activities tracker transparent (alpha 0).\nShows seasonal event and monthly quest progress bars.\nLayout space remains; mouse input is disabled outside combat."
     },
     {
         key = "collapseUIWidgets",
         label = "Widgets",
         tip =
-        "Make the UI Widget objective tracker transparent (alpha 0).\nShows general widget-based objectives.\nLayout space and mouse interaction are unchanged."
+        "Make the UI Widget objective tracker transparent (alpha 0).\nShows general widget-based objectives.\nLayout space remains; mouse input is disabled outside combat."
     },
     {
         key = "collapseAdventureMaps",
         label = "Adventure",
         tip =
-        "Make the Adventure Map Quest tracker transparent (alpha 0).\nShows objectives from the adventure map.\nLayout space and mouse interaction are unchanged."
+        "Make the Adventure Map Quest tracker transparent (alpha 0).\nShows objectives from the adventure map.\nLayout space remains; mouse input is disabled outside combat."
     },
 }
 
