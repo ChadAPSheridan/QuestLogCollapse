@@ -468,7 +468,7 @@ local defaultSettingsType = {
         name = "Default Settings",
         color = "|cffffff00",
         contextTip =
-        "Used when no instance-specific settings apply. These settings do not trigger any actions during combat."
+        "Used when no instance-specific settings apply, including on combat entry."
     },
 }
 local instanceTypes = {

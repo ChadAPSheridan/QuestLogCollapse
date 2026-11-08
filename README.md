@@ -17,11 +17,11 @@ profiles and `collapse*` setting keys remain compatible; `/qlc collapse` and
 
 - **Automatic Section Transparency**: Makes selected sections transparent when entering instances and restores opacity when leaving
 - **Instance Type Configuration**: Different settings for dungeons, raids, scenarios, battlegrounds, and arenas
-- **Default Settings**: Settings used when no instance-specific settings apply; combat itself does not trigger tracker changes
+- **Default Settings**: Settings used when no instance-specific settings apply, including in combat
 - **Individual Section Control**: Choose which objective tracker sections become transparent (quests, achievements, bonus objectives, etc.)
 - **Character-Specific Profiles**: Settings saved per character with support for multiple profiles
 - **GUI Configuration**: Easy-to-use configuration panel accessible via `/qlc config`
-- **Combat Safety**: Manual tracker operations are deferred during combat to prevent taint issues
+- **Combat Handling**: Configured sections become transparent on combat entry and return to their prior alpha afterward; manual commands are deferred
 - **Nameplate Integration**: Optional nameplate management for different instance types
 - **Debug Mode**: Optional debug messages to track addon behavior
 - **Manual Control**: Commands to set configured sections to alpha 0 or restore all sections to alpha 1
@@ -56,7 +56,7 @@ The addon provides several slash commands for basic control:
 
 ### Combat Safety
 
-- Combat does not trigger automatic tracker changes.
+- On combat entry, configured sections become transparent; combat end restores the previous alpha of sections changed by combat. Sections already transparent remain unchanged.
 - Manual alpha operations requested during combat retain the existing deferral behavior.
 - Use `/qlc expand` during combat to cancel queued transparency and request opacity restoration.
 
@@ -78,7 +78,7 @@ The addon features a comprehensive configuration panel accessible via `/qlc conf
 
 ### Instance Type Settings
 
-Configure different behaviors for each type of instance. **Default Settings** are used when no instance-specific settings apply; they do not trigger actions just because combat starts.
+Configure different behaviors for each type of instance. **Default Settings** are used when no instance-specific settings apply, including on combat entry.
 
 - **Default Settings**: Fallback settings outside recognized instance contexts
 - **Dungeons**: 5-player group content
@@ -117,7 +117,7 @@ For each instance type, choose which objective tracker sections become transpare
 The addon uses the World of Warcraft API to:
 
 1. **Detect Zone Changes**: Listens to the `ZONE_CHANGED_NEW_AREA` event
-2. **Avoid Protected Operations During Combat**: Defers manual tracker changes until combat ends
+2. **Handle Combat**: Applies configured transparency on entry, restores changed sections on exit, and defers manual commands
 3. **Check Instance Type**: Uses `IsInInstance()` to determine if you're in a dungeon, raid, scenario, battleground, or arena
 4. **Apply Instance-Specific Settings**: Uses different configurations based on the type of instance you're in
 5. **Use Default Settings**: Falls back to the default settings when no instance-specific settings apply
@@ -135,7 +135,7 @@ The addon uses the World of Warcraft API to:
 
 ### Manual Operations During Combat
 
-- Combat does not trigger automatic tracker changes.
+- Combat entry makes configured sections transparent; combat exit restores their previous alpha if combat changed them.
 - Manual transparency/opacity commands retain combat deferral.
 - Use `/qlc expand` during combat to cancel queued transparency and restore opacity after combat.
 
@@ -158,7 +158,8 @@ QuestLogCollapse/
 - `PLAYER_STARTED_MOVING` - Triggers pending zone filter when player moves (hardware-initiated)
 - `UNIT_SPELLCAST_SUCCEEDED` - Triggers pending zone filter when player casts spells/abilities (hardware-initiated)
 - `PLAYER_MOUNT_DISPLAY_CHANGED` - Triggers pending zone filter when mounting/dismounting (hardware-initiated)
-- `PLAYER_REGEN_ENABLED` - Apply manually queued tracker operations after combat
+- `PLAYER_REGEN_DISABLED` - Apply configured section transparency on combat entry
+- `PLAYER_REGEN_ENABLED` - Restore combat-changed alpha and apply manually queued operations
 
 ### Zone Filtering Triggers (Taint-Safe)
 
