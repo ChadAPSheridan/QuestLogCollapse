@@ -4,6 +4,7 @@
 -- Version: 1.6.2
 -- Updated: 2026-11-06
 
+-- WOW FOREVER'S PROJECT ID IS: 18
 
 local addonName, ns = ...
 
@@ -99,77 +100,83 @@ local defaults = {
         collapseWorldQuests = false,
         namePlates = { enabled = false },
     },
-    garrisons = {
-        enabled = false,
-        collapseQuests = false,
-        collapseAchievements = false,
-        collapseBonusObjectives = false,
-        collapseScenarios = false,
-        collapseCampaigns = false,
-        collapseProfessions = false,
-        collapseMonthlyActivities = false,
-        collapseUIWidgets = false,
-        collapseAdventureMaps = false,
-        collapseWorldQuests = false,
-        namePlates = { enabled = false },
-    },
-    classHalls = {
-        enabled = false,
-        collapseQuests = false,
-        collapseAchievements = false,
-        collapseBonusObjectives = false,
-        collapseScenarios = false,
-        collapseCampaigns = false,
-        collapseProfessions = false,
-        collapseMonthlyActivities = false,
-        collapseUIWidgets = false,
-        collapseAdventureMaps = false,
-        collapseWorldQuests = false,
-        namePlates = { enabled = false },
-    },
-    questTables = {
-        enabled = false,
-        collapseQuests = false,
-        collapseAchievements = false,
-        collapseBonusObjectives = false,
-        collapseScenarios = false,
-        collapseCampaigns = false,
-        collapseProfessions = false,
-        collapseMonthlyActivities = false,
-        collapseUIWidgets = false,
-        collapseAdventureMaps = false,
-        collapseWorldQuests = false,
-        namePlates = { enabled = false },
-    },
-    neighbourhood = {
-        enabled = false,
-        collapseQuests = false,
-        collapseAchievements = false,
-        collapseBonusObjectives = false,
-        collapseScenarios = false,
-        collapseCampaigns = false,
-        collapseProfessions = false,
-        collapseMonthlyActivities = false,
-        collapseUIWidgets = false,
-        collapseAdventureMaps = false,
-        collapseWorldQuests = false,
-        namePlates = { enabled = false },
-    },
-    house = {
-        enabled = false,
-        collapseQuests = false,
-        collapseAchievements = false,
-        collapseBonusObjectives = false,
-        collapseScenarios = false,
-        collapseCampaigns = false,
-        collapseProfessions = false,
-        collapseMonthlyActivities = false,
-        collapseUIWidgets = false,
-        collapseAdventureMaps = false,
-        collapseWorldQuests = false,
-        namePlates = { enabled = false },
-    },
 }
+if WOW_PROJECT_ID == WOW_PROJECT_MAINLINE then
+    -- Append legacy instance types for retail WoW (garrisons, class halls, quest tables)
+    -- These are not used in Classic WoW, so they are omitted from the defaults table there.
+    table.insert(defaults, {
+        garrisons = {
+            enabled = false,
+            collapseQuests = false,
+            collapseAchievements = false,
+            collapseBonusObjectives = false,
+            collapseScenarios = false,
+            collapseCampaigns = false,
+            collapseProfessions = false,
+            collapseMonthlyActivities = false,
+            collapseUIWidgets = false,
+            collapseAdventureMaps = false,
+            collapseWorldQuests = false,
+            namePlates = { enabled = false },
+        },
+        classHalls = {
+            enabled = false,
+            collapseQuests = false,
+            collapseAchievements = false,
+            collapseBonusObjectives = false,
+            collapseScenarios = false,
+            collapseCampaigns = false,
+            collapseProfessions = false,
+            collapseMonthlyActivities = false,
+            collapseUIWidgets = false,
+            collapseAdventureMaps = false,
+            collapseWorldQuests = false,
+            namePlates = { enabled = false },
+        },
+        questTables = {
+            enabled = false,
+            collapseQuests = false,
+            collapseAchievements = false,
+            collapseBonusObjectives = false,
+            collapseScenarios = false,
+            collapseCampaigns = false,
+            collapseProfessions = false,
+            collapseMonthlyActivities = false,
+            collapseUIWidgets = false,
+            collapseAdventureMaps = false,
+            collapseWorldQuests = false,
+            namePlates = { enabled = false },
+        },
+        neighbourhood = {
+            enabled = false,
+            collapseQuests = false,
+            collapseAchievements = false,
+            collapseBonusObjectives = false,
+            collapseScenarios = false,
+            collapseCampaigns = false,
+            collapseProfessions = false,
+            collapseMonthlyActivities = false,
+            collapseUIWidgets = false,
+            collapseAdventureMaps = false,
+            collapseWorldQuests = false,
+            namePlates = { enabled = false },
+        },
+        house = {
+            enabled = false,
+            collapseQuests = false,
+            collapseAchievements = false,
+            collapseBonusObjectives = false,
+            collapseScenarios = false,
+            collapseCampaigns = false,
+            collapseProfessions = false,
+            collapseMonthlyActivities = false,
+            collapseUIWidgets = false,
+            collapseAdventureMaps = false,
+            collapseWorldQuests = false,
+            namePlates = { enabled = false },
+        }
+    })
+end
 
 local function DeepCopy(source)
     if type(source) ~= "table" then
@@ -505,41 +512,42 @@ local pvpTypes = {
         contextTip = "Applied when you enter a PvP arena."
     },
 }
-local housingTypes = {
-    {
-        key = "neighbourhood",
-        name = "Neighbourhood",
-        color = "|cff80ff80",
-        contextTip = "Applied in The War Within Neighbourhood areas."
-    },
-    {
-        key = "house",
-        name = "Player Housing",
-        color = "|cffff80ff",
-        contextTip = "Applied inside your Player House."
-    },
-}
-local legacyTypes = {
-    {
-        key = "garrisons",
-        name = "Garrisons",
-        color = "|cffffc000",
-        contextTip = "Applied inside a Warlords of Draenor Garrison."
-    },
-    {
-        key = "classHalls",
-        name = "Class Halls",
-        color = "|cffff00ff",
-        contextTip = "Applied inside a Legion Class Hall."
-    },
-    {
-        key = "questTables",
-        name = "Quest Tables",
-        color = "|cffff8080",
-        contextTip = "Applied when at a garrison mission table."
-    },
-}
-
+if WOW_PROJECT_ID == WOW_PROJECT_MAINLINE then
+    local housingTypes = {
+        {
+            key = "neighbourhood",
+            name = "Neighbourhood",
+            color = "|cff80ff80",
+            contextTip = "Applied in The War Within Neighbourhood areas."
+        },
+        {
+            key = "house",
+            name = "Player Housing",
+            color = "|cffff80ff",
+            contextTip = "Applied inside your Player House."
+        },
+    }
+    local legacyTypes = {
+        {
+            key = "garrisons",
+            name = "Garrisons",
+            color = "|cffffc000",
+            contextTip = "Applied inside a Warlords of Draenor Garrison."
+        },
+        {
+            key = "classHalls",
+            name = "Class Halls",
+            color = "|cffff00ff",
+            contextTip = "Applied inside a Legion Class Hall."
+        },
+        {
+            key = "questTables",
+            name = "Quest Tables",
+            color = "|cffff8080",
+            contextTip = "Applied when at a garrison mission table."
+        },
+    }
+end
 -- ============================================================
 -- SUB-PANEL FACTORY  (Instance Settings / PvP / Housing / Legacy)
 -- ============================================================
@@ -867,10 +875,16 @@ configEventFrame:SetScript("OnEvent", function(self, event)
             local basicOpts    = CreateBasicOptionsPanel()
             local instPanel    = BuildContainerPanel("Instances", instanceTypes, false)
             local pvpPanel     = BuildContainerPanel("PvP", pvpTypes, false)
-            local housingPanel = BuildContainerPanel("Housing", housingTypes, false)
-            local legacyPanel  = BuildContainerPanel("Legacy", legacyTypes, true)
+            if WOW_PROJECT_ID == WOW_PROJECT_MAINLINE then
+                local housingPanel = BuildContainerPanel("Housing", housingTypes, false)
+                local legacyPanel  = BuildContainerPanel("Legacy", legacyTypes, true)
+            end
 
-            allPanels          = { basicOpts, instPanel, pvpPanel, housingPanel, legacyPanel }
+            allPanels          = { basicOpts, instPanel, pvpPanel}
+            if WOW_PROJECT_ID == WOW_PROJECT_MAINLINE then
+                table.insert(allPanels, housingPanel)
+                table.insert(allPanels, legacyPanel)
+            end
 
             -- Register parent category (Basic Options)
             local parentCat    = Settings.RegisterCanvasLayoutCategory(basicOpts, "QuestLogCollapse")
@@ -885,8 +899,10 @@ configEventFrame:SetScript("OnEvent", function(self, event)
             end
             RegSub(instPanel, "Instances")
             RegSub(pvpPanel, "PvP")
-            RegSub(housingPanel, "Housing")
-            RegSub(legacyPanel, "Legacy")
+            if WOW_PROJECT_ID == WOW_PROJECT_MAINLINE then
+                RegSub(housingPanel, "Housing")
+                RegSub(legacyPanel, "Legacy")
+            end
 
             panelRegistered = true
         end
