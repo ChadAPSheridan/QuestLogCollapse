@@ -1,8 +1,8 @@
 -- QuestLogCollapse: Automatically fades quest tracker sections when entering instances
 -- Author: Gaspode
 -- Contributors: Artherion77
--- Version: 1.6.1
--- Updated: 2026-10-25
+-- Version: 1.6.2
+-- Updated: 2026-11-06
 
 -- TAINT PROTECTION STRATEGY:
 -- Implemented namespace to avoid global variable pollution
@@ -10,7 +10,7 @@
 
 -- Use addon namespace to prevent global variable pollution and taint
 local addonName, ns = ...
-local ADDON_VERSION = "1.6.1"
+local ADDON_VERSION = "1.6.2"
 
 -- Create addon frame (local to prevent global pollution)
 local QuestLogCollapse = CreateFrame("Frame")
@@ -111,7 +111,6 @@ local function MarkZoneFilterTrigger(reason)
     lastZoneFilterTrigger = reason or "unknown"
 end
 
--- "Have we installed the HookScript already?" guards. Kept as file-locals to avoid tainting
 -- Blizzard frame tables, which would block all protected operations on those frames.
 
 local mapFrameHooked = false
@@ -194,7 +193,71 @@ local function UpdateNamePlates()
 end
 ns.UpdateNamePlates = UpdateNamePlates
 
--- Keep legacy operation names and saved settings; only change visual alpha.
+local transparentTrackers = {}
+local disabledMouseRegions = {}
+
+local DisableMouseTree
+local function DisableMouseChildren(visited, ...)
+    for i = 1, select("#", ...) do
+        DisableMouseTree(select(i, ...), visited)
+    end
+end
+
+DisableMouseTree = function(region, visited)
+    if visited[region] then return end
+    visited[region] = true
+
+    local clicks = region:IsMouseClickEnabled()
+    local motion = region:IsMouseMotionEnabled()
+    local wheel = region:IsMouseWheelEnabled()
+    local original = disabledMouseRegions[region]
+    if not original and (clicks or motion or wheel) then
+        original = { clicks = clicks, motion = motion, wheel = wheel }
+        disabledMouseRegions[region] = original
+    end
+    if original then
+        original.clicks = original.clicks or clicks
+        original.motion = original.motion or motion
+        original.wheel = original.wheel or wheel
+    end
+    if clicks then region:SetMouseClickEnabled(false) end
+    if motion then region:SetMouseMotionEnabled(false) end
+    if wheel then region:EnableMouseWheel(false) end
+
+    if region.GetChildren then
+        DisableMouseChildren(visited, region:GetChildren())
+    end
+    if region.GetRegions then
+        DisableMouseChildren(visited, region:GetRegions())
+    end
+end
+
+local function UpdateTransparentMouse()
+    if InCombatLockdown() then return end
+
+    local visited = {}
+    for tracker in pairs(transparentTrackers) do
+        DisableMouseTree(tracker, visited)
+    end
+    for region, original in pairs(disabledMouseRegions) do
+        if not visited[region] then
+            if original.clicks then region:SetMouseClickEnabled(true) end
+            if original.motion then region:SetMouseMotionEnabled(true) end
+            if original.wheel then region:EnableMouseWheel(true) end
+            disabledMouseRegions[region] = nil
+        end
+    end
+end
+
+-- Tracker blocks are created and reused dynamically.
+local mouseFrame = CreateFrame("Frame")
+mouseFrame:SetScript("OnUpdate", function()
+    if next(transparentTrackers) or next(disabledMouseRegions) then
+        UpdateTransparentMouse()
+    end
+end)
+
+-- Keep legacy operation names and saved settings.
 local function SafeCollapseTracker(tracker, name, shouldCollapse)
     if not isFullyLoaded or not tracker or not shouldCollapse then
         DebugPrint(name .. " not found, not fully loaded, or shouldCollapse is false")
@@ -222,6 +285,8 @@ local function SafeCollapseTracker(tracker, name, shouldCollapse)
 
     if type(tracker.SetAlpha) == "function" then
         tracker:SetAlpha(0)
+        transparentTrackers[tracker] = true
+        UpdateTransparentMouse()
         DebugPrint(name .. " section made transparent")
         return true
     end
@@ -294,6 +359,8 @@ local function SafeExpandTracker(tracker, name)
 
     if type(tracker.SetAlpha) == "function" then
         tracker:SetAlpha(1)
+        transparentTrackers[tracker] = nil
+        UpdateTransparentMouse()
         DebugPrint(name .. " section made opaque")
         return true
     end
@@ -973,8 +1040,7 @@ C_Timer.After(2, function()
 end)
 
 -- Hook Quest Log / Objective Tracker interaction.
--- Modern retail moved the minimize button from `ObjectiveTrackerFrame.HeaderMenu`
--- to `ObjectiveTrackerFrame.Header`; we probe both rather than hard-code one.
+
 local function FindTrackerMinimizeButton()
     local OT = ObjectiveTrackerFrame
     if not OT then return nil end

@@ -6,7 +6,10 @@ Optionally can filter quests to current zone (triggered by user actions to avoid
 
 Sections use alpha **0** for transparent and **1** for opaque instead of calling
 Blizzard's collapse/expand methods. Their layout space and native collapsed state
-are unchanged, and invisible content can still receive mouse input. Existing
+are unchanged. Mouse clicks, hover and wheel input are disabled for transparent
+sections and restored when they become opaque or frames leave the section.
+Mouse-state updates are deferred during combat, so newly created or re-enabled
+controls may temporarily receive input until combat ends. Existing
 profiles and `collapse*` setting keys remain compatible; `/qlc collapse` and
 `/qlc expand` now change section alpha.
 
@@ -218,7 +221,9 @@ Scenario support, unchanged native collapsed state, and combat/map deferral.
 Section visibility uses alpha rather than native collapse/expand calls to avoid
 the shared tracker layout path involved in `ShouldShowMawBuffs` aura errors.
 The Scenario section supports the same alpha behavior as other sections.
-Alpha changes do not reclaim layout space or disable mouse input.
+Alpha changes do not reclaim layout space. Mouse input is suppressed on transparent
+sections outside combat; controls created or re-enabled in combat may remain
+interactive until combat ends.
 
 Reload the UI after updating to clear taint from previous native collapse calls.
 Combat deferral and namespaces do not cleanse taint, and zone filtering still
@@ -269,6 +274,12 @@ Feel free to submit issues, feature requests, or pull requests to improve this a
 This project is open source. Feel free to modify and distribute as needed.
 
 ## Changelog
+
+### Version 1.6.2
+
+- Updated compatible version to include World of Warcraft Forever (Interface 16001)
+- Updated documentation to reflect new compatible version
+- Changed collapse/expand commands to include disabling mouse input on transparent sections outside combat, and restoring input when sections become opaque or leave the section
 
 ### Version 1.6.1
 
