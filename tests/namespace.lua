@@ -37,6 +37,7 @@ local function run(savedDB, savedCharDB)
         "SetSize", "SetPoint", "SetBackdrop", "SetBackdropColor",
         "SetBackdropBorderColor", "SetTextColor", "SetColorTexture",
         "SetHeight", "SetScrollChild", "Disable", "SetMotionScriptsWhileDisabled",
+        "SetMovable", "SetClampedToScreen", "RegisterForDrag",
     }) do
         methods[name] = function() end
     end
@@ -68,6 +69,7 @@ local function run(savedDB, savedCharDB)
     function methods:IsMouseClickEnabled() return self.mouseClick or false end
     function methods:IsMouseMotionEnabled() return self.mouseMotion or false end
     function methods:IsMouseWheelEnabled() return self.mouseWheel or false end
+    function methods:CanChangeProtectedState() return not inCombat end
     function methods:SetMouseClickEnabled(enabled) assert(not inCombat); self.mouseClick = enabled end
     function methods:SetMouseMotionEnabled(enabled) assert(not inCombat); self.mouseMotion = enabled end
     function methods:EnableMouseWheel(enabled) assert(not inCombat); self.mouseWheel = enabled end
@@ -210,7 +212,6 @@ local function run(savedDB, savedCharDB)
     ns.SwitchProfile("Default")
     assert(ns.GetCurrentQLCProfile() == ns.db.profiles.Default)
 
-    -- Deferred work must reach the shared processor after map activity ends.
     local defaultSettings = ns.GetCurrentQLCProfile().defaultSettings
     assert(ns.GetCurrentInstanceSettings() == defaultSettings, "Open-world context did not use default settings")
     defaultSettings.enabled, defaultSettings.collapseQuests = true, true
@@ -238,7 +239,7 @@ local function run(savedDB, savedCharDB)
     assert(enemyNameplates == "0", "Default settings did not restore the original nameplate state")
     ns.HandleSlashCommand("collapse")
     for _, tracker in ipairs(trackers) do
-        assert(tracker:GetAlpha() == 1, "Alpha changed before deferred work ran")
+        assert(tracker:GetAlpha() == 0, "Manual transparency was not applied")
     end
     now = 16
     update()
@@ -302,6 +303,54 @@ local function run(savedDB, savedCharDB)
     assert(globals.QuestObjectiveTracker:GetAlpha() == 1, "Combat-deferred opacity was not restored")
     assert(combatChild.mouseClick, "Combat-created child mouse state was not restored")
 
+    -- Combat restores only sections it made transparent, including non-default alpha.
+    globals.QuestObjectiveTracker:SetAlpha(0.6)
+    globals.AchievementObjectiveTracker:SetAlpha(0)
+    inCombat = true
+    event("PLAYER_REGEN_DISABLED")
+    assert(globals.QuestObjectiveTracker:GetAlpha() == 0, "Combat did not apply transparency")
+    assert(globals.AchievementObjectiveTracker:GetAlpha() == 0, "Already transparent section changed")
+    inCombat = false
+    event("PLAYER_REGEN_ENABLED")
+    assert(globals.QuestObjectiveTracker:GetAlpha() == 0.6, "Combat did not restore original alpha")
+    assert(globals.AchievementObjectiveTracker:GetAlpha() == 0, "Pre-existing transparency was lost")
+    assert(header.mouseClick and header.mouseMotion, "Combat did not restore mouse interaction")
+    ns.HandleSlashCommand("expand")
+
+    -- A section already hidden by the addon must stay hidden after combat.
+    ns.HandleSlashCommand("collapse")
+    inCombat = true
+    event("PLAYER_REGEN_DISABLED")
+    inCombat = false
+    event("PLAYER_REGEN_ENABLED")
+    assert(globals.QuestObjectiveTracker:GetAlpha() == 0, "Combat restored a previously hidden section")
+    assert(not header.mouseClick, "Previously hidden section regained mouse input")
+    ns.HandleSlashCommand("expand")
+
+    -- Explicit combat commands take precedence over automatic restoration.
+    inCombat = true
+    event("PLAYER_REGEN_DISABLED")
+    ns.HandleSlashCommand("collapse")
+    inCombat = false
+    event("PLAYER_REGEN_ENABLED")
+    assert(globals.QuestObjectiveTracker:GetAlpha() == 0, "Queued transparency was lost at combat end")
+    ns.HandleSlashCommand("expand")
+
+    inCombat = true
+    event("PLAYER_REGEN_DISABLED")
+    ns.HandleSlashCommand("expand")
+    inCombat = false
+    event("PLAYER_REGEN_ENABLED")
+    assert(globals.QuestObjectiveTracker:GetAlpha() == 1, "Queued restoration was lost at combat end")
+
+    inCombat = true
+    event("PLAYER_REGEN_DISABLED")
+    ns.GetCurrentQLCProfile().enabled = false
+    inCombat = false
+    event("PLAYER_REGEN_ENABLED")
+    assert(globals.QuestObjectiveTracker:GetAlpha() == 1, "Disabling the addon prevented combat restoration")
+    ns.GetCurrentQLCProfile().enabled = true
+
     instanceType = "party"
     dungeonSettings.enabled, dungeonSettings.collapseCampaigns = true, true
     event("ZONE_CHANGED_NEW_AREA")
@@ -310,6 +359,14 @@ local function run(savedDB, savedCharDB)
     runTimers()
     assert(globals.CampaignQuestObjectiveTracker:GetAlpha() == 0, "Instance entry did not apply transparency")
     assert(globals.QuestObjectiveTracker:GetAlpha() == 1, "Instance entry changed an unselected section")
+    dungeonSettings.collapseQuests = true
+    inCombat = true
+    event("PLAYER_REGEN_DISABLED")
+    assert(globals.QuestObjectiveTracker:GetAlpha() == 0, "Instance combat did not apply transparency")
+    inCombat = false
+    event("PLAYER_REGEN_ENABLED")
+    assert(globals.QuestObjectiveTracker:GetAlpha() == 1, "Instance combat did not restore newly hidden section")
+    assert(globals.CampaignQuestObjectiveTracker:GetAlpha() == 0, "Instance combat restored a previously hidden section")
     instanceType = "none"
     event("ZONE_CHANGED_NEW_AREA")
     now = 34

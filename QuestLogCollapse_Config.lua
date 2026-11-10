@@ -1,9 +1,10 @@
 -- QuestLogCollapse Configuration Panel
 -- Author: Gaspode
 -- Contributors: Artherion77 (significant ui revamp in 1.4.0)
--- Version: 1.6.2
--- Updated: 2026-11-06
+-- Version: 1.7.0
+-- Updated: 2026-11-09
 
+-- WOW FOREVER'S PROJECT ID IS: 18
 
 local addonName, ns = ...
 
@@ -99,77 +100,83 @@ local defaults = {
         collapseWorldQuests = false,
         namePlates = { enabled = false },
     },
-    garrisons = {
-        enabled = false,
-        collapseQuests = false,
-        collapseAchievements = false,
-        collapseBonusObjectives = false,
-        collapseScenarios = false,
-        collapseCampaigns = false,
-        collapseProfessions = false,
-        collapseMonthlyActivities = false,
-        collapseUIWidgets = false,
-        collapseAdventureMaps = false,
-        collapseWorldQuests = false,
-        namePlates = { enabled = false },
-    },
-    classHalls = {
-        enabled = false,
-        collapseQuests = false,
-        collapseAchievements = false,
-        collapseBonusObjectives = false,
-        collapseScenarios = false,
-        collapseCampaigns = false,
-        collapseProfessions = false,
-        collapseMonthlyActivities = false,
-        collapseUIWidgets = false,
-        collapseAdventureMaps = false,
-        collapseWorldQuests = false,
-        namePlates = { enabled = false },
-    },
-    questTables = {
-        enabled = false,
-        collapseQuests = false,
-        collapseAchievements = false,
-        collapseBonusObjectives = false,
-        collapseScenarios = false,
-        collapseCampaigns = false,
-        collapseProfessions = false,
-        collapseMonthlyActivities = false,
-        collapseUIWidgets = false,
-        collapseAdventureMaps = false,
-        collapseWorldQuests = false,
-        namePlates = { enabled = false },
-    },
-    neighbourhood = {
-        enabled = false,
-        collapseQuests = false,
-        collapseAchievements = false,
-        collapseBonusObjectives = false,
-        collapseScenarios = false,
-        collapseCampaigns = false,
-        collapseProfessions = false,
-        collapseMonthlyActivities = false,
-        collapseUIWidgets = false,
-        collapseAdventureMaps = false,
-        collapseWorldQuests = false,
-        namePlates = { enabled = false },
-    },
-    house = {
-        enabled = false,
-        collapseQuests = false,
-        collapseAchievements = false,
-        collapseBonusObjectives = false,
-        collapseScenarios = false,
-        collapseCampaigns = false,
-        collapseProfessions = false,
-        collapseMonthlyActivities = false,
-        collapseUIWidgets = false,
-        collapseAdventureMaps = false,
-        collapseWorldQuests = false,
-        namePlates = { enabled = false },
-    },
 }
+if WOW_PROJECT_ID == WOW_PROJECT_MAINLINE then
+    -- Append legacy instance types for retail WoW (garrisons, class halls, quest tables)
+    -- These are not used in Classic WoW, so they are omitted from the defaults table there.
+    table.insert(defaults, {
+        garrisons = {
+            enabled = false,
+            collapseQuests = false,
+            collapseAchievements = false,
+            collapseBonusObjectives = false,
+            collapseScenarios = false,
+            collapseCampaigns = false,
+            collapseProfessions = false,
+            collapseMonthlyActivities = false,
+            collapseUIWidgets = false,
+            collapseAdventureMaps = false,
+            collapseWorldQuests = false,
+            namePlates = { enabled = false },
+        },
+        classHalls = {
+            enabled = false,
+            collapseQuests = false,
+            collapseAchievements = false,
+            collapseBonusObjectives = false,
+            collapseScenarios = false,
+            collapseCampaigns = false,
+            collapseProfessions = false,
+            collapseMonthlyActivities = false,
+            collapseUIWidgets = false,
+            collapseAdventureMaps = false,
+            collapseWorldQuests = false,
+            namePlates = { enabled = false },
+        },
+        questTables = {
+            enabled = false,
+            collapseQuests = false,
+            collapseAchievements = false,
+            collapseBonusObjectives = false,
+            collapseScenarios = false,
+            collapseCampaigns = false,
+            collapseProfessions = false,
+            collapseMonthlyActivities = false,
+            collapseUIWidgets = false,
+            collapseAdventureMaps = false,
+            collapseWorldQuests = false,
+            namePlates = { enabled = false },
+        },
+        neighbourhood = {
+            enabled = false,
+            collapseQuests = false,
+            collapseAchievements = false,
+            collapseBonusObjectives = false,
+            collapseScenarios = false,
+            collapseCampaigns = false,
+            collapseProfessions = false,
+            collapseMonthlyActivities = false,
+            collapseUIWidgets = false,
+            collapseAdventureMaps = false,
+            collapseWorldQuests = false,
+            namePlates = { enabled = false },
+        },
+        house = {
+            enabled = false,
+            collapseQuests = false,
+            collapseAchievements = false,
+            collapseBonusObjectives = false,
+            collapseScenarios = false,
+            collapseCampaigns = false,
+            collapseProfessions = false,
+            collapseMonthlyActivities = false,
+            collapseUIWidgets = false,
+            collapseAdventureMaps = false,
+            collapseWorldQuests = false,
+            namePlates = { enabled = false },
+        }
+    })
+end
 
 local function DeepCopy(source)
     if type(source) ~= "table" then
@@ -287,28 +294,28 @@ local SECTIONS_ROW1  = {
         key = "collapseQuests",
         label = "Quests",
         tip =
-        "Make the Quest tracker transparent (alpha 0).\nShows standard quests with objectives in your current area.\nLayout space remains; mouse input is disabled outside combat."
+        "Make the Quest tracker transparent (alpha 0).\nShows standard quests with objectives in your current area.\nLayout space remains; mouse input is disabled immediately unless protected in combat."
     },
     {
         key = "collapseAchievements",
         label = "Achievements",
-        tip = "Make the Achievement tracker transparent (alpha 0).\nShows progress toward tracked achievement criteria.\nLayout space remains; mouse input is disabled outside combat."
+        tip = "Make the Achievement tracker transparent (alpha 0).\nShows progress toward tracked achievement criteria.\nLayout space remains; mouse input is disabled immediately unless protected in combat."
     },
     {
         key = "collapseBonusObjectives",
         label = "Bonus",
         tip =
-        "Make the Bonus Objective tracker transparent (alpha 0).\nShows area bonus objectives and rare encounters.\nLayout space remains; mouse input is disabled outside combat."
+        "Make the Bonus Objective tracker transparent (alpha 0).\nShows area bonus objectives and rare encounters.\nLayout space remains; mouse input is disabled immediately unless protected in combat."
     },
     {
         key = "collapseCampaigns",
         label = "Campaigns",
-        tip = "Make the Campaign Quest tracker transparent (alpha 0).\nTracks story campaign and chapter quest chains.\nLayout space remains; mouse input is disabled outside combat."
+        tip = "Make the Campaign Quest tracker transparent (alpha 0).\nTracks story campaign and chapter quest chains.\nLayout space remains; mouse input is disabled immediately unless protected in combat."
     },
     {
         key = "collapseScenarios",
         label = "Scenario",
-        tip = "Make the Scenario/Dungeon objective tracker transparent (alpha 0).\nShows dungeon and scenario step objectives.\nLayout space remains; mouse input is disabled outside combat."
+        tip = "Make the Scenario/Dungeon objective tracker transparent (alpha 0).\nShows dungeon and scenario step objectives.\nLayout space remains; mouse input is disabled immediately unless protected in combat."
     },
 }
 local SECTIONS_ROW2  = {
@@ -316,30 +323,30 @@ local SECTIONS_ROW2  = {
         key = "collapseWorldQuests",
         label = "World Quests",
         tip =
-        "Make the World Quest tracker transparent (alpha 0).\nShows world quests on the map.\nLayout space remains; mouse input is disabled outside combat."
+        "Make the World Quest tracker transparent (alpha 0).\nShows world quests on the map.\nLayout space remains; mouse input is disabled immediately unless protected in combat."
     },
     {
         key = "collapseProfessions",
         label = "Professions",
-        tip = "Make the Profession Recipe tracker transparent (alpha 0).\nShows active crafting work orders and profession recipes.\nLayout space remains; mouse input is disabled outside combat."
+        tip = "Make the Profession Recipe tracker transparent (alpha 0).\nShows active crafting work orders and profession recipes.\nLayout space remains; mouse input is disabled immediately unless protected in combat."
     },
     {
         key = "collapseMonthlyActivities",
         label = "Monthly",
         tip =
-        "Make the Monthly Activities tracker transparent (alpha 0).\nShows seasonal event and monthly quest progress bars.\nLayout space remains; mouse input is disabled outside combat."
+        "Make the Monthly Activities tracker transparent (alpha 0).\nShows seasonal event and monthly quest progress bars.\nLayout space remains; mouse input is disabled immediately unless protected in combat."
     },
     {
         key = "collapseUIWidgets",
         label = "Widgets",
         tip =
-        "Make the UI Widget objective tracker transparent (alpha 0).\nShows general widget-based objectives.\nLayout space remains; mouse input is disabled outside combat."
+        "Make the UI Widget objective tracker transparent (alpha 0).\nShows general widget-based objectives.\nLayout space remains; mouse input is disabled immediately unless protected in combat."
     },
     {
         key = "collapseAdventureMaps",
         label = "Adventure",
         tip =
-        "Make the Adventure Map Quest tracker transparent (alpha 0).\nShows objectives from the adventure map.\nLayout space remains; mouse input is disabled outside combat."
+        "Make the Adventure Map Quest tracker transparent (alpha 0).\nShows objectives from the adventure map.\nLayout space remains; mouse input is disabled immediately unless protected in combat."
     },
 }
 
@@ -468,7 +475,7 @@ local defaultSettingsType = {
         name = "Default Settings",
         color = "|cffffff00",
         contextTip =
-        "Used when no instance-specific settings apply. These settings do not trigger any actions during combat."
+        "Used when no instance-specific settings apply, including on combat entry."
     },
 }
 local instanceTypes = {
@@ -505,41 +512,42 @@ local pvpTypes = {
         contextTip = "Applied when you enter a PvP arena."
     },
 }
-local housingTypes = {
-    {
-        key = "neighbourhood",
-        name = "Neighbourhood",
-        color = "|cff80ff80",
-        contextTip = "Applied in The War Within Neighbourhood areas."
-    },
-    {
-        key = "house",
-        name = "Player Housing",
-        color = "|cffff80ff",
-        contextTip = "Applied inside your Player House."
-    },
-}
-local legacyTypes = {
-    {
-        key = "garrisons",
-        name = "Garrisons",
-        color = "|cffffc000",
-        contextTip = "Applied inside a Warlords of Draenor Garrison."
-    },
-    {
-        key = "classHalls",
-        name = "Class Halls",
-        color = "|cffff00ff",
-        contextTip = "Applied inside a Legion Class Hall."
-    },
-    {
-        key = "questTables",
-        name = "Quest Tables",
-        color = "|cffff8080",
-        contextTip = "Applied when at a garrison mission table."
-    },
-}
-
+if WOW_PROJECT_ID == WOW_PROJECT_MAINLINE then
+    local housingTypes = {
+        {
+            key = "neighbourhood",
+            name = "Neighbourhood",
+            color = "|cff80ff80",
+            contextTip = "Applied in The War Within Neighbourhood areas."
+        },
+        {
+            key = "house",
+            name = "Player Housing",
+            color = "|cffff80ff",
+            contextTip = "Applied inside your Player House."
+        },
+    }
+    local legacyTypes = {
+        {
+            key = "garrisons",
+            name = "Garrisons",
+            color = "|cffffc000",
+            contextTip = "Applied inside a Warlords of Draenor Garrison."
+        },
+        {
+            key = "classHalls",
+            name = "Class Halls",
+            color = "|cffff00ff",
+            contextTip = "Applied inside a Legion Class Hall."
+        },
+        {
+            key = "questTables",
+            name = "Quest Tables",
+            color = "|cffff8080",
+            contextTip = "Applied when at a garrison mission table."
+        },
+    }
+end
 -- ============================================================
 -- SUB-PANEL FACTORY  (Instance Settings / PvP / Housing / Legacy)
 -- ============================================================
@@ -867,10 +875,16 @@ configEventFrame:SetScript("OnEvent", function(self, event)
             local basicOpts    = CreateBasicOptionsPanel()
             local instPanel    = BuildContainerPanel("Instances", instanceTypes, false)
             local pvpPanel     = BuildContainerPanel("PvP", pvpTypes, false)
-            local housingPanel = BuildContainerPanel("Housing", housingTypes, false)
-            local legacyPanel  = BuildContainerPanel("Legacy", legacyTypes, true)
+            if WOW_PROJECT_ID == WOW_PROJECT_MAINLINE then
+                local housingPanel = BuildContainerPanel("Housing", housingTypes, false)
+                local legacyPanel  = BuildContainerPanel("Legacy", legacyTypes, true)
+            end
 
-            allPanels          = { basicOpts, instPanel, pvpPanel, housingPanel, legacyPanel }
+            allPanels          = { basicOpts, instPanel, pvpPanel}
+            if WOW_PROJECT_ID == WOW_PROJECT_MAINLINE then
+                table.insert(allPanels, housingPanel)
+                table.insert(allPanels, legacyPanel)
+            end
 
             -- Register parent category (Basic Options)
             local parentCat    = Settings.RegisterCanvasLayoutCategory(basicOpts, "QuestLogCollapse")
@@ -885,8 +899,10 @@ configEventFrame:SetScript("OnEvent", function(self, event)
             end
             RegSub(instPanel, "Instances")
             RegSub(pvpPanel, "PvP")
-            RegSub(housingPanel, "Housing")
-            RegSub(legacyPanel, "Legacy")
+            if WOW_PROJECT_ID == WOW_PROJECT_MAINLINE then
+                RegSub(housingPanel, "Housing")
+                RegSub(legacyPanel, "Legacy")
+            end
 
             panelRegistered = true
         end

@@ -1,8 +1,8 @@
 -- QuestLogCollapse: Automatically fades quest tracker sections when entering instances
 -- Author: Gaspode
 -- Contributors: Artherion77
--- Version: 1.6.2
--- Updated: 2026-11-06
+-- Version: 1.7.0
+-- Updated: 2026-11-09
 
 -- TAINT PROTECTION STRATEGY:
 -- Implemented namespace to avoid global variable pollution
@@ -10,13 +10,13 @@
 
 -- Use addon namespace to prevent global variable pollution and taint
 local addonName, ns = ...
-local ADDON_VERSION = "1.6.2"
+local ADDON_VERSION = "1.7.0"
 
 -- Create addon frame (local to prevent global pollution)
 local QuestLogCollapse = CreateFrame("Frame")
 QuestLogCollapse:RegisterEvent("ADDON_LOADED")
 QuestLogCollapse:RegisterEvent("ZONE_CHANGED_NEW_AREA")
--- Combat start is intentionally not handled; combat does not trigger automatic tracker changes.
+QuestLogCollapse:RegisterEvent("PLAYER_REGEN_DISABLED")
 QuestLogCollapse:RegisterEvent("PLAYER_REGEN_ENABLED")
 QuestLogCollapse:RegisterEvent("PLAYER_ENTERING_WORLD")
 QuestLogCollapse:RegisterEvent("PLAYER_STARTED_MOVING")
@@ -28,6 +28,7 @@ QuestLogCollapse:RegisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
 local mapSystemBusy = false
 local mapSystemBusyUntil = 0
 local pendingOperations = {}
+local toggleButton
 
 -- Shared tracker definitions used by all tracker operations.
 local TRACKER_DEFS = {
@@ -87,7 +88,8 @@ local isFullyLoaded = false
 -- Track combat state for delayed operations
 local combatStateQueue = {
     shouldCollapseOnCombatEnd = false,
-    shouldExpandOnCombatEnd = false
+    shouldExpandOnCombatEnd = false,
+    shouldHideAllOnCombatEnd = false,
 }
 
 -- Track nameplate state to restore properly
@@ -195,6 +197,7 @@ ns.UpdateNamePlates = UpdateNamePlates
 
 local transparentTrackers = {}
 local disabledMouseRegions = {}
+local combatChangedTrackers = {}
 
 local DisableMouseTree
 local function DisableMouseChildren(visited, ...)
@@ -207,22 +210,24 @@ DisableMouseTree = function(region, visited)
     if visited[region] then return end
     visited[region] = true
 
-    local clicks = region:IsMouseClickEnabled()
-    local motion = region:IsMouseMotionEnabled()
-    local wheel = region:IsMouseWheelEnabled()
-    local original = disabledMouseRegions[region]
-    if not original and (clicks or motion or wheel) then
-        original = { clicks = clicks, motion = motion, wheel = wheel }
-        disabledMouseRegions[region] = original
+    if region:CanChangeProtectedState() then
+        local clicks = region:IsMouseClickEnabled()
+        local motion = region:IsMouseMotionEnabled()
+        local wheel = region:IsMouseWheelEnabled()
+        local original = disabledMouseRegions[region]
+        if not original and (clicks or motion or wheel) then
+            original = { clicks = clicks, motion = motion, wheel = wheel }
+            disabledMouseRegions[region] = original
+        end
+        if original then
+            original.clicks = original.clicks or clicks
+            original.motion = original.motion or motion
+            original.wheel = original.wheel or wheel
+        end
+        if clicks then region:SetMouseClickEnabled(false) end
+        if motion then region:SetMouseMotionEnabled(false) end
+        if wheel then region:EnableMouseWheel(false) end
     end
-    if original then
-        original.clicks = original.clicks or clicks
-        original.motion = original.motion or motion
-        original.wheel = original.wheel or wheel
-    end
-    if clicks then region:SetMouseClickEnabled(false) end
-    if motion then region:SetMouseMotionEnabled(false) end
-    if wheel then region:EnableMouseWheel(false) end
 
     if region.GetChildren then
         DisableMouseChildren(visited, region:GetChildren())
@@ -233,14 +238,12 @@ DisableMouseTree = function(region, visited)
 end
 
 local function UpdateTransparentMouse()
-    if InCombatLockdown() then return end
-
     local visited = {}
     for tracker in pairs(transparentTrackers) do
         DisableMouseTree(tracker, visited)
     end
     for region, original in pairs(disabledMouseRegions) do
-        if not visited[region] then
+        if not visited[region] and region:CanChangeProtectedState() then
             if original.clicks then region:SetMouseClickEnabled(true) end
             if original.motion then region:SetMouseMotionEnabled(true) end
             if original.wheel then region:EnableMouseWheel(true) end
@@ -258,23 +261,10 @@ mouseFrame:SetScript("OnUpdate", function()
 end)
 
 -- Keep legacy operation names and saved settings.
-local function SafeCollapseTracker(tracker, name, shouldCollapse)
+local function SafeCollapseTracker(tracker, name, shouldCollapse, combatChanges)
     if not isFullyLoaded or not tracker or not shouldCollapse then
         DebugPrint(name .. " not found, not fully loaded, or shouldCollapse is false")
         return false
-    end
-
-    -- NEVER manipulate trackers during combat to avoid taint
-    if InCombatLockdown() then
-        DebugPrint("Skipping " .. name .. " transparency - in combat")
-        return false
-    end
-
-    -- Avoid operations when map system might be busy
-    if mapSystemBusy then
-        DebugPrint("Deferring " .. name .. " transparency - map system busy")
-        QueuePendingOperation(name, "collapse")
-        return true
     end
 
     -- Check if this operation is already pending
@@ -284,6 +274,11 @@ local function SafeCollapseTracker(tracker, name, shouldCollapse)
     end
 
     if type(tracker.SetAlpha) == "function" then
+        if combatChanges then
+            local alpha = tracker:GetAlpha()
+            if alpha == 0 then return false end
+            combatChanges[tracker] = { alpha = alpha, wasTransparent = transparentTrackers[tracker] }
+        end
         tracker:SetAlpha(0)
         transparentTrackers[tracker] = true
         UpdateTransparentMouse()
@@ -295,13 +290,7 @@ local function SafeCollapseTracker(tracker, name, shouldCollapse)
     return false
 end
 
-local function CollapseQuestLog()
-    -- NEVER do anything during combat to avoid taint
-    if InCombatLockdown() then
-        DebugPrint("CollapseQuestLog() skipped - in combat")
-        return
-    end
-
+local function CollapseQuestLog(combatChanges)
     -- Get instance-specific settings from config system
     local settings = ns.GetCurrentInstanceSettings and ns.GetCurrentInstanceSettings()
 
@@ -323,7 +312,7 @@ local function CollapseQuestLog()
     local collapsed = 0
 
     for _, def in ipairs(TRACKER_DEFS) do
-        if SafeCollapseTracker(def.getter(), def.name, settings[def.settingKey]) then
+        if SafeCollapseTracker(def.getter(), def.name, settings[def.settingKey], combatChanges) then
             collapsed = collapsed + 1
         end
     end
@@ -407,6 +396,34 @@ local function ExpandQuestLog()
         end
     end
     DebugPrint("Made " .. expanded .. " sections/modules opaque")
+end
+
+local function HideAllTrackers()
+    combatStateQueue.shouldCollapseOnCombatEnd = false
+    combatStateQueue.shouldHideAllOnCombatEnd = false
+    combatStateQueue.shouldExpandOnCombatEnd = false
+    for _, def in ipairs(TRACKER_DEFS) do
+        pendingOperations[def.name] = nil
+        local tracker = def.getter()
+        if tracker then combatChangedTrackers[tracker] = nil end
+        SafeCollapseTracker(tracker, def.name, true)
+    end
+end
+
+local function ShowAllTrackers()
+    combatStateQueue.shouldCollapseOnCombatEnd = false
+    combatStateQueue.shouldHideAllOnCombatEnd = false
+    combatStateQueue.shouldExpandOnCombatEnd = false
+    for _, def in ipairs(TRACKER_DEFS) do
+        pendingOperations[def.name] = nil
+        local tracker = def.getter()
+        if tracker and type(tracker.SetAlpha) == "function" then
+            tracker:SetAlpha(1)
+            transparentTrackers[tracker] = nil
+            combatChangedTrackers[tracker] = nil
+        end
+    end
+    UpdateTransparentMouse()
 end
 
 -- Filter quests by current zone
@@ -642,6 +659,11 @@ local function OnAddonLoaded(loadedAddonName)
     end
 
     ns.InitializeConfigDB()
+    local position = ns.charDB and ns.charDB.toggleButtonPosition
+    if position then
+        toggleButton:ClearAllPoints()
+        toggleButton:SetPoint(position.point, UIParent, position.relativePoint, position.x, position.y)
+    end
 
     -- Basic legacy fallback initialization - detailed profile config handled by config file.
     for key, value in pairs(GetLegacyDefaults()) do
@@ -665,31 +687,36 @@ local function OnAddonLoaded(loadedAddonName)
 end
 
 local function OnCombatStateChanged(event)
-    local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or ns.db
-    if not profile or not profile.enabled then
-        DebugPrint("Addon disabled or no profile found")
-        return
-    end
-
     if event == "PLAYER_REGEN_ENABLED" then
+        for tracker, original in pairs(combatChangedTrackers) do
+            tracker:SetAlpha(original.alpha)
+            transparentTrackers[tracker] = original.wasTransparent
+            combatChangedTrackers[tracker] = nil
+        end
+        UpdateTransparentMouse()
+        ns.ProcessPendingOperations()
         DebugPrint("Leaving combat - checking queued operations and quest log state")
 
-        if combatStateQueue.enteredCombatOutsideInstance and combatStateQueue.shouldCollapseOnCombatEnd then
+        if combatStateQueue.shouldHideAllOnCombatEnd then
+            HideAllTrackers()
+            combatStateQueue.shouldHideAllOnCombatEnd = false
+        elseif combatStateQueue.shouldCollapseOnCombatEnd then
             DebugPrint("Applying queued transparency after combat")
             CollapseQuestLog()
             combatStateQueue.shouldCollapseOnCombatEnd = false
-            combatStateQueue.trackersWereCollapsedInCombat = true
         elseif combatStateQueue.shouldExpandOnCombatEnd then
             DebugPrint("Applying queued opacity restoration after combat")
             ExpandQuestLog()
             combatStateQueue.shouldExpandOnCombatEnd = false
-        elseif combatStateQueue.enteredCombatOutsideInstance then
-            DebugPrint("Combat ended outside instance with no queued alpha changes")
         end
-
-        -- Reset combat tracking
-        combatStateQueue.enteredCombatOutsideInstance = false
-        combatStateQueue.trackersWereCollapsedInCombat = false
+    elseif event == "PLAYER_REGEN_DISABLED" then
+        local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or ns.db
+        if not profile or not profile.enabled then
+            DebugPrint("Addon disabled or no profile found")
+            return
+        end
+        DebugPrint("Entering combat - triggering alpha and mouse interaction changes if needed")
+        CollapseQuestLog(combatChangedTrackers)
     end
 end
 
@@ -708,6 +735,8 @@ QuestLogCollapse:SetScript("OnEvent", function(self, event, ...)
     elseif event == "ZONE_CHANGED_NEW_AREA" then
         SetMapSystemBusy(8)
         OnZoneChanged()
+    elseif event == "PLAYER_REGEN_DISABLED" then
+        OnCombatStateChanged(event)
     elseif event == "PLAYER_REGEN_ENABLED" then
         -- Handle combat options
         OnCombatStateChanged(event)
@@ -777,7 +806,7 @@ function ns.HandleSlashCommand(msg)
         print("|cffff0000/qlc config|r - Open configuration panel")
         print("")
         print("|cff00ff00Combat Safety:|r")
-        print("• Automatic tracker changes are not triggered by combat")
+        print("• Configured sections become transparent on combat entry and return to their prior alpha afterward")
         print("• Manual tracker operations requested during combat are deferred until combat ends")
         print("• Use |cffff0000/qlc expand|r during combat to cancel queued operations")
         print("")
@@ -846,8 +875,8 @@ function ns.HandleSlashCommand(msg)
         end
 
         print("|cff00ff00Combat Queue Status:|r")
-        print("  Entered Combat Outside Instance: " .. (combatStateQueue.enteredCombatOutsideInstance and "Yes" or "No"))
         print("  Transparency Queued: " .. (combatStateQueue.shouldCollapseOnCombatEnd and "Yes" or "No"))
+        print("  Hide All Queued: " .. (combatStateQueue.shouldHideAllOnCombatEnd and "Yes" or "No"))
         print("  Opacity Restoration Queued: " .. (combatStateQueue.shouldExpandOnCombatEnd and "Yes" or "No"))
 
         print("|cff00ff00Nameplate Status:|r")
@@ -894,11 +923,9 @@ function ns.HandleSlashCommand(msg)
     elseif args[1] == "collapse" then
         if InCombatLockdown() then
             print("|cff00ff00QuestLogCollapse|r Cannot change section alpha during combat - will apply when combat ends")
-            -- Queue the operation if we're outside dungeons
-            if not IsInDungeon() then
-                combatStateQueue.shouldCollapseOnCombatEnd = true
-                combatStateQueue.shouldExpandOnCombatEnd = false
-            end
+            combatStateQueue.shouldCollapseOnCombatEnd = true
+            combatStateQueue.shouldExpandOnCombatEnd = false
+            combatStateQueue.shouldHideAllOnCombatEnd = false
         else
             CollapseQuestLog()
             print("|cff00ff00QuestLogCollapse|r requested alpha 0 for configured sections (layout unchanged)")
@@ -909,6 +936,7 @@ function ns.HandleSlashCommand(msg)
             -- Cancel any queued operations and clear combat state
             combatStateQueue.shouldCollapseOnCombatEnd = false
             combatStateQueue.shouldExpandOnCombatEnd = true
+            combatStateQueue.shouldHideAllOnCombatEnd = false
         else
             ExpandQuestLog()
             print("|cff00ff00QuestLogCollapse|r requested alpha 1 for all sections")
@@ -945,8 +973,8 @@ function ns.HandleSlashCommand(msg)
             print("  Settings enabled: " .. tostring(settings.enabled))
         end
         print("|cff00ff00Combat Queue Status:|r")
-        print("  Entered Combat Outside Instance: " .. (combatStateQueue.enteredCombatOutsideInstance and "Yes" or "No"))
         print("  Transparency Queued: " .. (combatStateQueue.shouldCollapseOnCombatEnd and "Yes" or "No"))
+        print("  Hide All Queued: " .. (combatStateQueue.shouldHideAllOnCombatEnd and "Yes" or "No"))
         print("  Opacity Restoration Queued: " .. (combatStateQueue.shouldExpandOnCombatEnd and "Yes" or "No"))
     elseif args[1] == "testcombat" then
         print("|cff00ff00QuestLogCollapse Current Settings Test:|r")
@@ -992,6 +1020,72 @@ function ns.HandleSlashCommand(msg)
         print("|cff00ff00QuestLogCollapse|r Unknown command. Type |cffff0000/qlc help|r for available commands.")
     end
 end
+
+toggleButton = CreateFrame("Button", nil, UIParent, "UIPanelButtonTemplate")
+toggleButton:SetSize(110, 22)
+toggleButton:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -280, -180)
+toggleButton:SetText("QLC Show/Hide")
+toggleButton:SetMovable(true)
+toggleButton:SetClampedToScreen(true)
+toggleButton:RegisterForDrag("RightButton")
+toggleButton:SetScript("OnDragStart", function(self)
+    self:StartMoving()
+end)
+toggleButton:SetScript("OnDragStop", function(self)
+    self:StopMovingOrSizing()
+    local point, _, relativePoint, x, y = self:GetPoint()
+    if ns.charDB then
+        ns.charDB.toggleButtonPosition = { point = point, relativePoint = relativePoint, x = x, y = y }
+    end
+end)
+toggleButton:SetScript("OnClick", function()
+    if not isFullyLoaded then
+        print("|cff00ff00QuestLogCollapse|r Tracker is not ready yet")
+        return
+    end
+
+    local available = false
+    for _, def in ipairs(TRACKER_DEFS) do
+        if def.getter() then
+            available = true
+            break
+        end
+    end
+    if not available then
+        print("|cff00ff00QuestLogCollapse|r No tracker sections are available")
+        return
+    end
+
+    local inCombat = InCombatLockdown()
+    local shouldShow
+    if next(transparentTrackers) then
+        shouldShow = true
+    elseif combatStateQueue.shouldHideAllOnCombatEnd or combatStateQueue.shouldCollapseOnCombatEnd then
+        shouldShow = true
+    elseif combatStateQueue.shouldExpandOnCombatEnd then
+        shouldShow = false
+    else
+        shouldShow = false
+        for _, operation in pairs(pendingOperations) do
+            if operation.action == "expand" then
+                shouldShow = false
+                break
+            end
+        end
+    end
+
+    if shouldShow then
+        ShowAllTrackers()
+        if inCombat then
+            print("|cff00ff00QuestLogCollapse|r Sections shown; protected mouse controls will update after combat")
+        end
+    else
+        HideAllTrackers()
+        if inCombat then
+            print("|cff00ff00QuestLogCollapse|r Sections hidden; protected mouse controls will update after combat")
+        end
+    end
+end)
 
 -- WoW discovers slash commands through these global registrations.
 _G.SLASH_QUESTLOGCOLLAPSE1 = "/qlc"

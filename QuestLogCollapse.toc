@@ -1,10 +1,10 @@
-## Interface: 120000, 120001, 120500, 120700, 120100, 16001
+## Interface: 120107, 120105, 50504, 20506, 11509, 16001
 ## Title: QuestLogCollapse
 ## Notes: Automatically makes configured quest tracker sections transparent in instances
 ## Author: Gaspode
 ## Contributors: Artherion77
-## Version: 1.6.2
-## Updated: 2026-11-06
+## Version: 1.7.0
+## Updated: 2026-11-09
 
 ## SavedVariables: QuestLogCollapseDB
 ## SavedVariablesPerCharacter: QuestLogCollapseCharDB

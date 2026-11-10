@@ -8,8 +8,9 @@ Sections use alpha **0** for transparent and **1** for opaque instead of calling
 Blizzard's collapse/expand methods. Their layout space and native collapsed state
 are unchanged. Mouse clicks, hover and wheel input are disabled for transparent
 sections and restored when they become opaque or frames leave the section.
-Mouse-state updates are deferred during combat, so newly created or re-enabled
-controls may temporarily receive input until combat ends. Existing
+Mouse-state updates apply immediately where WoW permits them, including in combat.
+Protected controls wait until combat ends, so they may temporarily retain their
+previous interaction state. Existing
 profiles and `collapse*` setting keys remain compatible; `/qlc collapse` and
 `/qlc expand` now change section alpha.
 
@@ -17,14 +18,15 @@ profiles and `collapse*` setting keys remain compatible; `/qlc collapse` and
 
 - **Automatic Section Transparency**: Makes selected sections transparent when entering instances and restores opacity when leaving
 - **Instance Type Configuration**: Different settings for dungeons, raids, scenarios, battlegrounds, and arenas
-- **Default Settings**: Settings used when no instance-specific settings apply; combat itself does not trigger tracker changes
+- **Default Settings**: Settings used when no instance-specific settings apply, including in combat
 - **Individual Section Control**: Choose which objective tracker sections become transparent (quests, achievements, bonus objectives, etc.)
 - **Character-Specific Profiles**: Settings saved per character with support for multiple profiles
 - **GUI Configuration**: Easy-to-use configuration panel accessible via `/qlc config`
-- **Combat Safety**: Manual tracker operations are deferred during combat to prevent taint issues
+- **Combat Handling**: Configured sections become transparent on combat entry and return to their prior alpha afterward; manual commands are deferred
 - **Nameplate Integration**: Optional nameplate management for different instance types
 - **Debug Mode**: Optional debug messages to track addon behavior
 - **Manual Control**: Commands to set configured sections to alpha 0 or restore all sections to alpha 1
+- **Show/Hide Button**: The on-screen `QLC Show/Hide` button toggles all available tracker sections, regardless of section settings
 - **No Native Collapse Calls**: Alpha changes avoid the native collapse/expand update path; this is not a guarantee against all Blizzard taint bugs
 - **Lightweight**: Minimal performance impact with efficient event handling
 
@@ -41,6 +43,12 @@ profiles and `collapse*` setting keys remain compatible; `/qlc collapse` and
 
 The addon provides several slash commands for basic control:
 
+The `QLC Show/Hide` button near the upper-right of the screen hides all available
+tracker sections or restores their opacity. It remains visible when sections
+are transparent. The button shows and hides sections immediately, including in
+combat; only protected mouse controls wait until combat ends. Layout space remains
+reserved. Right-drag the button to move it; its position is saved per character.
+
 - `/qlc` or `/questlogcollapse` - Show help menu
 - `/qlc config` - Open the configuration panel (recommended)
 - `/qlc toggle` - Enable/disable the addon
@@ -56,7 +64,7 @@ The addon provides several slash commands for basic control:
 
 ### Combat Safety
 
-- Combat does not trigger automatic tracker changes.
+- On combat entry, configured sections become transparent; combat end restores the previous alpha of sections changed by combat. Sections already transparent remain unchanged.
 - Manual alpha operations requested during combat retain the existing deferral behavior.
 - Use `/qlc expand` during combat to cancel queued transparency and request opacity restoration.
 
@@ -78,7 +86,7 @@ The addon features a comprehensive configuration panel accessible via `/qlc conf
 
 ### Instance Type Settings
 
-Configure different behaviors for each type of instance. **Default Settings** are used when no instance-specific settings apply; they do not trigger actions just because combat starts.
+Configure different behaviors for each type of instance. **Default Settings** are used when no instance-specific settings apply, including on combat entry.
 
 - **Default Settings**: Fallback settings outside recognized instance contexts
 - **Dungeons**: 5-player group content
@@ -117,7 +125,7 @@ For each instance type, choose which objective tracker sections become transpare
 The addon uses the World of Warcraft API to:
 
 1. **Detect Zone Changes**: Listens to the `ZONE_CHANGED_NEW_AREA` event
-2. **Avoid Protected Operations During Combat**: Defers manual tracker changes until combat ends
+2. **Handle Combat**: Applies configured transparency on entry, restores changed sections on exit, and defers manual commands
 3. **Check Instance Type**: Uses `IsInInstance()` to determine if you're in a dungeon, raid, scenario, battleground, or arena
 4. **Apply Instance-Specific Settings**: Uses different configurations based on the type of instance you're in
 5. **Use Default Settings**: Falls back to the default settings when no instance-specific settings apply
@@ -135,7 +143,7 @@ The addon uses the World of Warcraft API to:
 
 ### Manual Operations During Combat
 
-- Combat does not trigger automatic tracker changes.
+- Combat entry makes configured sections transparent; combat exit restores their previous alpha if combat changed them.
 - Manual transparency/opacity commands retain combat deferral.
 - Use `/qlc expand` during combat to cancel queued transparency and restore opacity after combat.
 
@@ -158,7 +166,8 @@ QuestLogCollapse/
 - `PLAYER_STARTED_MOVING` - Triggers pending zone filter when player moves (hardware-initiated)
 - `UNIT_SPELLCAST_SUCCEEDED` - Triggers pending zone filter when player casts spells/abilities (hardware-initiated)
 - `PLAYER_MOUNT_DISPLAY_CHANGED` - Triggers pending zone filter when mounting/dismounting (hardware-initiated)
-- `PLAYER_REGEN_ENABLED` - Apply manually queued tracker operations after combat
+- `PLAYER_REGEN_DISABLED` - Apply configured section transparency on combat entry
+- `PLAYER_REGEN_ENABLED` - Restore combat-changed alpha and apply manually queued operations
 
 ### Zone Filtering Triggers (Taint-Safe)
 
@@ -192,6 +201,7 @@ Run `lua5.1 tests/namespace.lua` from the repository root to check namespace
 isolation, saved-variable identity, settings registration, and deferred operations
 with a mocked WoW environment. The checks also cover per-section alpha values,
 Scenario support, unchanged native collapsed state, and combat/map deferral.
+Run `lua5.1 tests/button.lua` to check the standalone show/hide button and its queue.
 
 ## Compatibility
 
@@ -222,8 +232,8 @@ Section visibility uses alpha rather than native collapse/expand calls to avoid
 the shared tracker layout path involved in `ShouldShowMawBuffs` aura errors.
 The Scenario section supports the same alpha behavior as other sections.
 Alpha changes do not reclaim layout space. Mouse input is suppressed on transparent
-sections outside combat; controls created or re-enabled in combat may remain
-interactive until combat ends.
+sections, including during combat where permitted. Protected controls retain their
+previous interaction state until combat ends.
 
 Reload the UI after updating to clear taint from previous native collapse calls.
 Combat deferral and namespaces do not cleanse taint, and zone filtering still
@@ -274,6 +284,10 @@ Feel free to submit issues, feature requests, or pull requests to improve this a
 This project is open source. Feel free to modify and distribute as needed.
 
 ## Changelog
+
+### Version 1.7.0
+
+- Added a moveable show/hide button to override the current state when needed
 
 ### Version 1.6.2
 
