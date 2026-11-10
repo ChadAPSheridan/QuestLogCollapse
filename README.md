@@ -8,7 +8,8 @@ Sections use alpha **0** for transparent and **1** for opaque instead of calling
 Blizzard's collapse/expand methods. Their layout space and native collapsed state
 are unchanged. Mouse clicks, hover and wheel input are disabled for transparent
 sections and restored when they become opaque or frames leave the section.
-Mouse-state updates are deferred during combat, so newly created or re-enabled
+Mouse-state updates are deferred during combat, so controls shown in combat
+may remain non-interactive until combat ends, while newly created or re-enabled
 controls may temporarily receive input until combat ends. Existing
 profiles and `collapse*` setting keys remain compatible; `/qlc collapse` and
 `/qlc expand` now change section alpha.
@@ -44,8 +45,9 @@ The addon provides several slash commands for basic control:
 
 The `QLC Show/Hide` button near the upper-right of the screen hides all available
 tracker sections or restores their opacity. It remains visible when sections
-are transparent. Button actions requested in combat are applied after combat;
-layout space remains reserved.
+are transparent. The button shows sections immediately in combat, but restores
+their mouse interaction afterward; hiding sections is queued until combat ends.
+Layout space remains reserved.
 
 - `/qlc` or `/questlogcollapse` - Show help menu
 - `/qlc config` - Open the configuration panel (recommended)

@@ -404,6 +404,22 @@ local function HideAllTrackers()
     end
 end
 
+local function ShowAllTrackers()
+    combatStateQueue.shouldCollapseOnCombatEnd = false
+    combatStateQueue.shouldHideAllOnCombatEnd = false
+    combatStateQueue.shouldExpandOnCombatEnd = false
+    for _, def in ipairs(TRACKER_DEFS) do
+        pendingOperations[def.name] = nil
+        local tracker = def.getter()
+        if tracker and type(tracker.SetAlpha) == "function" then
+            tracker:SetAlpha(1)
+            transparentTrackers[tracker] = nil
+            combatChangedTrackers[tracker] = nil
+        end
+    end
+    UpdateTransparentMouse()
+end
+
 -- Filter quests by current zone
 -- This function is only safe to call from:
 -- 1. Slash commands (user-initiated)
@@ -1016,13 +1032,16 @@ toggleButton:SetScript("OnClick", function()
         return
     end
 
+    local inCombat = InCombatLockdown()
     local shouldShow
-    if combatStateQueue.shouldHideAllOnCombatEnd or combatStateQueue.shouldCollapseOnCombatEnd then
+    if next(transparentTrackers) then
+        shouldShow = true
+    elseif combatStateQueue.shouldHideAllOnCombatEnd or combatStateQueue.shouldCollapseOnCombatEnd then
         shouldShow = true
     elseif combatStateQueue.shouldExpandOnCombatEnd then
         shouldShow = false
     else
-        shouldShow = next(transparentTrackers) ~= nil
+        shouldShow = false
         for _, operation in pairs(pendingOperations) do
             if operation.action == "expand" then
                 shouldShow = false
@@ -1031,13 +1050,16 @@ toggleButton:SetScript("OnClick", function()
         end
     end
 
-    if InCombatLockdown() then
+    if shouldShow then
+        ShowAllTrackers()
+        if inCombat then
+            print("|cff00ff00QuestLogCollapse|r Sections shown; mouse input will be restored after combat")
+        end
+    elseif inCombat then
         combatStateQueue.shouldCollapseOnCombatEnd = false
-        combatStateQueue.shouldHideAllOnCombatEnd = not shouldShow
-        combatStateQueue.shouldExpandOnCombatEnd = shouldShow
-        print("|cff00ff00QuestLogCollapse|r Section visibility change queued until combat ends")
-    elseif shouldShow then
-        ExpandQuestLog()
+        combatStateQueue.shouldHideAllOnCombatEnd = true
+        combatStateQueue.shouldExpandOnCombatEnd = false
+        print("|cff00ff00QuestLogCollapse|r Hiding sections queued until combat ends")
     else
         HideAllTrackers()
     end

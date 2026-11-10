@@ -91,16 +91,17 @@ assert(quest:GetAlpha() == 1, "Button acted before the tracker was ready")
 event("ADDON_LOADED", "QuestLogCollapse")
 event("PLAYER_ENTERING_WORLD")
 
--- A second click cancels an opacity restoration deferred by map activity.
+-- Button visibility changes do not wait for map activity.
 click()
 assert(quest:GetAlpha() == 0 and campaign:GetAlpha() == 0, "Button did not hide all sections")
 assert(not child.clicks and not child.motion, "Hidden section still accepts mouse input")
 click()
-assert(quest:GetAlpha() == 0, "Map-busy restoration was not deferred")
+assert(quest:GetAlpha() == 1 and campaign:GetAlpha() == 1, "Map activity blocked button visibility")
+assert(child.clicks and child.motion, "Mouse input was not restored")
 click()
 now = 16
 update()
-assert(quest:GetAlpha() == 0 and campaign:GetAlpha() == 0, "Stale restoration overrode the latest click")
+assert(quest:GetAlpha() == 0 and campaign:GetAlpha() == 0, "Latest hide click did not persist")
 click()
 assert(quest:GetAlpha() == 1 and campaign:GetAlpha() == 1, "Button did not restore all sections")
 assert(child.clicks and child.motion, "Mouse input was not restored")
@@ -118,9 +119,12 @@ event("PLAYER_REGEN_ENABLED")
 assert(quest:GetAlpha() == 0 and campaign:GetAlpha() == 0, "Queued hide-all was not applied")
 inCombat = true
 click()
+assert(quest:GetAlpha() == 1 and campaign:GetAlpha() == 1, "Button did not show sections during combat")
+assert(not child.clicks and not child.motion, "Mouse input changed during combat")
 inCombat = false
 event("PLAYER_REGEN_ENABLED")
 assert(quest:GetAlpha() == 1 and campaign:GetAlpha() == 1, "Queued show-all was not applied")
+assert(child.clicks and child.motion, "Deferred mouse restoration did not run")
 
 inCombat = true
 click()
@@ -132,11 +136,29 @@ assert(quest:GetAlpha() == 1 and campaign:GetAlpha() == 1, "Slash command did no
 -- Existing combat-induced transparency is recognized by the button.
 profile.enabled = true
 settings.enabled, settings.collapseQuests = true, true
+quest:SetAlpha(0.6)
 inCombat = true
 event("PLAYER_REGEN_DISABLED")
 assert(quest:GetAlpha() == 0 and campaign:GetAlpha() == 1)
 click()
+assert(quest:GetAlpha() == 1 and campaign:GetAlpha() == 1, "Combat-hidden section was not shown immediately")
 inCombat = false
 event("PLAYER_REGEN_ENABLED")
-assert(quest:GetAlpha() == 1 and campaign:GetAlpha() == 1, "Button failed to show combat-hidden sections")
+assert(quest:GetAlpha() == 1 and campaign:GetAlpha() == 1, "Combat restoration overrode the button")
+
+-- A show request supersedes an earlier map-deferred restoration even in combat.
+settings.enabled = false
+event("ZONE_CHANGED_NEW_AREA")
+click()
+ns.HandleSlashCommand("expand")
+assert(quest:GetAlpha() == 0, "Map-busy restoration was not deferred")
+inCombat = true
+event("PLAYER_REGEN_DISABLED")
+click()
+assert(quest:GetAlpha() == 1 and campaign:GetAlpha() == 1, "Pending map restoration blocked showing in combat")
+inCombat = false
+event("PLAYER_REGEN_ENABLED")
+now = 25
+update()
+assert(quest:GetAlpha() == 1 and child.clicks, "Deferred work undid the in-combat show")
 print("Show/hide button checks passed")
