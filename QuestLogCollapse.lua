@@ -1,8 +1,8 @@
 -- QuestLogCollapse: Automatically fades quest tracker sections when entering instances
 -- Author: Gaspode
 -- Contributors: Artherion77
--- Version: 1.6.2
--- Updated: 2026-11-06
+-- Version: 1.7.0
+-- Updated: 2026-11-09
 
 -- TAINT PROTECTION STRATEGY:
 -- Implemented namespace to avoid global variable pollution
@@ -10,7 +10,7 @@
 
 -- Use addon namespace to prevent global variable pollution and taint
 local addonName, ns = ...
-local ADDON_VERSION = "1.6.2"
+local ADDON_VERSION = "1.7.0"
 
 -- Create addon frame (local to prevent global pollution)
 local QuestLogCollapse = CreateFrame("Frame")
@@ -28,6 +28,7 @@ QuestLogCollapse:RegisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
 local mapSystemBusy = false
 local mapSystemBusyUntil = 0
 local pendingOperations = {}
+local toggleButton
 
 -- Shared tracker definitions used by all tracker operations.
 local TRACKER_DEFS = {
@@ -209,22 +210,24 @@ DisableMouseTree = function(region, visited)
     if visited[region] then return end
     visited[region] = true
 
-    local clicks = region:IsMouseClickEnabled()
-    local motion = region:IsMouseMotionEnabled()
-    local wheel = region:IsMouseWheelEnabled()
-    local original = disabledMouseRegions[region]
-    if not original and (clicks or motion or wheel) then
-        original = { clicks = clicks, motion = motion, wheel = wheel }
-        disabledMouseRegions[region] = original
+    if region:CanChangeProtectedState() then
+        local clicks = region:IsMouseClickEnabled()
+        local motion = region:IsMouseMotionEnabled()
+        local wheel = region:IsMouseWheelEnabled()
+        local original = disabledMouseRegions[region]
+        if not original and (clicks or motion or wheel) then
+            original = { clicks = clicks, motion = motion, wheel = wheel }
+            disabledMouseRegions[region] = original
+        end
+        if original then
+            original.clicks = original.clicks or clicks
+            original.motion = original.motion or motion
+            original.wheel = original.wheel or wheel
+        end
+        if clicks then region:SetMouseClickEnabled(false) end
+        if motion then region:SetMouseMotionEnabled(false) end
+        if wheel then region:EnableMouseWheel(false) end
     end
-    if original then
-        original.clicks = original.clicks or clicks
-        original.motion = original.motion or motion
-        original.wheel = original.wheel or wheel
-    end
-    if clicks then region:SetMouseClickEnabled(false) end
-    if motion then region:SetMouseMotionEnabled(false) end
-    if wheel then region:EnableMouseWheel(false) end
 
     if region.GetChildren then
         DisableMouseChildren(visited, region:GetChildren())
@@ -235,14 +238,12 @@ DisableMouseTree = function(region, visited)
 end
 
 local function UpdateTransparentMouse()
-    if InCombatLockdown() then return end
-
     local visited = {}
     for tracker in pairs(transparentTrackers) do
         DisableMouseTree(tracker, visited)
     end
     for region, original in pairs(disabledMouseRegions) do
-        if not visited[region] then
+        if not visited[region] and region:CanChangeProtectedState() then
             if original.clicks then region:SetMouseClickEnabled(true) end
             if original.motion then region:SetMouseMotionEnabled(true) end
             if original.wheel then region:EnableMouseWheel(true) end
@@ -398,9 +399,14 @@ local function ExpandQuestLog()
 end
 
 local function HideAllTrackers()
+    combatStateQueue.shouldCollapseOnCombatEnd = false
+    combatStateQueue.shouldHideAllOnCombatEnd = false
+    combatStateQueue.shouldExpandOnCombatEnd = false
     for _, def in ipairs(TRACKER_DEFS) do
         pendingOperations[def.name] = nil
-        SafeCollapseTracker(def.getter(), def.name, true)
+        local tracker = def.getter()
+        if tracker then combatChangedTrackers[tracker] = nil end
+        SafeCollapseTracker(tracker, def.name, true)
     end
 end
 
@@ -653,6 +659,11 @@ local function OnAddonLoaded(loadedAddonName)
     end
 
     ns.InitializeConfigDB()
+    local position = ns.charDB and ns.charDB.toggleButtonPosition
+    if position then
+        toggleButton:ClearAllPoints()
+        toggleButton:SetPoint(position.point, UIParent, position.relativePoint, position.x, position.y)
+    end
 
     -- Basic legacy fallback initialization - detailed profile config handled by config file.
     for key, value in pairs(GetLegacyDefaults()) do
@@ -1010,10 +1021,23 @@ function ns.HandleSlashCommand(msg)
     end
 end
 
-local toggleButton = CreateFrame("Button", nil, UIParent, "UIPanelButtonTemplate")
+toggleButton = CreateFrame("Button", nil, UIParent, "UIPanelButtonTemplate")
 toggleButton:SetSize(110, 22)
 toggleButton:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -280, -180)
 toggleButton:SetText("QLC Show/Hide")
+toggleButton:SetMovable(true)
+toggleButton:SetClampedToScreen(true)
+toggleButton:RegisterForDrag("RightButton")
+toggleButton:SetScript("OnDragStart", function(self)
+    self:StartMoving()
+end)
+toggleButton:SetScript("OnDragStop", function(self)
+    self:StopMovingOrSizing()
+    local point, _, relativePoint, x, y = self:GetPoint()
+    if ns.charDB then
+        ns.charDB.toggleButtonPosition = { point = point, relativePoint = relativePoint, x = x, y = y }
+    end
+end)
 toggleButton:SetScript("OnClick", function()
     if not isFullyLoaded then
         print("|cff00ff00QuestLogCollapse|r Tracker is not ready yet")
@@ -1053,15 +1077,13 @@ toggleButton:SetScript("OnClick", function()
     if shouldShow then
         ShowAllTrackers()
         if inCombat then
-            print("|cff00ff00QuestLogCollapse|r Sections shown; mouse input will be restored after combat")
+            print("|cff00ff00QuestLogCollapse|r Sections shown; protected mouse controls will update after combat")
         end
-    elseif inCombat then
-        combatStateQueue.shouldCollapseOnCombatEnd = false
-        combatStateQueue.shouldHideAllOnCombatEnd = true
-        combatStateQueue.shouldExpandOnCombatEnd = false
-        print("|cff00ff00QuestLogCollapse|r Hiding sections queued until combat ends")
     else
         HideAllTrackers()
+        if inCombat then
+            print("|cff00ff00QuestLogCollapse|r Sections hidden; protected mouse controls will update after combat")
+        end
     end
 end)
 

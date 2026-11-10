@@ -8,9 +8,9 @@ Sections use alpha **0** for transparent and **1** for opaque instead of calling
 Blizzard's collapse/expand methods. Their layout space and native collapsed state
 are unchanged. Mouse clicks, hover and wheel input are disabled for transparent
 sections and restored when they become opaque or frames leave the section.
-Mouse-state updates are deferred during combat, so controls shown in combat
-may remain non-interactive until combat ends, while newly created or re-enabled
-controls may temporarily receive input until combat ends. Existing
+Mouse-state updates apply immediately where WoW permits them, including in combat.
+Protected controls wait until combat ends, so they may temporarily retain their
+previous interaction state. Existing
 profiles and `collapse*` setting keys remain compatible; `/qlc collapse` and
 `/qlc expand` now change section alpha.
 
@@ -45,9 +45,9 @@ The addon provides several slash commands for basic control:
 
 The `QLC Show/Hide` button near the upper-right of the screen hides all available
 tracker sections or restores their opacity. It remains visible when sections
-are transparent. The button shows sections immediately in combat, but restores
-their mouse interaction afterward; hiding sections is queued until combat ends.
-Layout space remains reserved.
+are transparent. The button shows and hides sections immediately, including in
+combat; only protected mouse controls wait until combat ends. Layout space remains
+reserved. Right-drag the button to move it; its position is saved per character.
 
 - `/qlc` or `/questlogcollapse` - Show help menu
 - `/qlc config` - Open the configuration panel (recommended)
@@ -232,8 +232,8 @@ Section visibility uses alpha rather than native collapse/expand calls to avoid
 the shared tracker layout path involved in `ShouldShowMawBuffs` aura errors.
 The Scenario section supports the same alpha behavior as other sections.
 Alpha changes do not reclaim layout space. Mouse input is suppressed on transparent
-sections outside combat; controls created or re-enabled in combat may remain
-interactive until combat ends.
+sections, including during combat where permitted. Protected controls retain their
+previous interaction state until combat ends.
 
 Reload the UI after updating to clear taint from previous native collapse calls.
 Combat deferral and namespaces do not cleanse taint, and zone filtering still
@@ -284,6 +284,10 @@ Feel free to submit issues, feature requests, or pull requests to improve this a
 This project is open source. Feel free to modify and distribute as needed.
 
 ## Changelog
+
+### Version 1.7.0
+
+- Added a moveable show/hide button to override the current state when needed
 
 ### Version 1.6.2
 

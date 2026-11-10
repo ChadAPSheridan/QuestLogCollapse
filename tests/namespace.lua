@@ -37,6 +37,7 @@ local function run(savedDB, savedCharDB)
         "SetSize", "SetPoint", "SetBackdrop", "SetBackdropColor",
         "SetBackdropBorderColor", "SetTextColor", "SetColorTexture",
         "SetHeight", "SetScrollChild", "Disable", "SetMotionScriptsWhileDisabled",
+        "SetMovable", "SetClampedToScreen", "RegisterForDrag",
     }) do
         methods[name] = function() end
     end
@@ -68,6 +69,7 @@ local function run(savedDB, savedCharDB)
     function methods:IsMouseClickEnabled() return self.mouseClick or false end
     function methods:IsMouseMotionEnabled() return self.mouseMotion or false end
     function methods:IsMouseWheelEnabled() return self.mouseWheel or false end
+    function methods:CanChangeProtectedState() return not inCombat end
     function methods:SetMouseClickEnabled(enabled) assert(not inCombat); self.mouseClick = enabled end
     function methods:SetMouseMotionEnabled(enabled) assert(not inCombat); self.mouseMotion = enabled end
     function methods:EnableMouseWheel(enabled) assert(not inCombat); self.mouseWheel = enabled end
