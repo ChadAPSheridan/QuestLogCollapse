@@ -1,5 +1,5 @@
 -- Run from the repository root with: lua5.1 tests/namespace.lua
-local function run(savedDB, savedCharDB)
+local function run(savedDB, savedCharDB, isMainline)
     local frames, timers, messages = {}, {}, {}
     local now, inCombat, instanceType = 0, false, "none"
     local enemyNameplates = "0"
@@ -15,6 +15,8 @@ local function run(savedDB, savedCharDB)
         QuestLogCollapseCharDB = savedCharDB,
         SlashCmdList = {},
         StaticPopupDialogs = {},
+        WOW_PROJECT_ID = isMainline and 1 or 2,
+        WOW_PROJECT_MAINLINE = 1,
     }
     for _, name in ipairs({
         "assert", "error", "ipairs", "next", "pairs", "select",
@@ -37,7 +39,7 @@ local function run(savedDB, savedCharDB)
         "SetSize", "SetPoint", "SetBackdrop", "SetBackdropColor",
         "SetBackdropBorderColor", "SetTextColor", "SetColorTexture",
         "SetHeight", "SetScrollChild", "Disable", "SetMotionScriptsWhileDisabled",
-        "SetMovable", "SetClampedToScreen", "RegisterForDrag",
+        "SetMovable", "SetClampedToScreen", "RegisterForDrag", "EnableMouse",
     }) do
         methods[name] = function() end
     end
@@ -187,17 +189,26 @@ local function run(savedDB, savedCharDB)
     if savedCharDB then assert(ns.charDB == savedCharDB, "Character DB identity changed") end
     local originalProfile = ns.GetCurrentQLCProfile()
     assert(originalProfile == ns.db.profiles[ns.charDB.currentProfile])
+    if isMainline then
+        for _, key in ipairs({ "neighbourhood", "house", "garrisons", "classHalls", "questTables" }) do
+            assert(type(originalProfile[key]) == "table", "Missing retail settings: " .. key)
+        end
+    end
 
     event("PLAYER_ENTERING_WORLD")
-    assert(#categories == 5, "Settings categories not registered")
+    local expectedCategories = isMainline and 5 or 3
+    assert(#categories == expectedCategories, "Settings categories not registered")
     assert(globals.SLASH_QUESTLOGCOLLAPSE1 == "/qlc")
     assert(globals.SLASH_QUESTLOGCOLLAPSE2 == "/questlogcollapse")
     assert(globals.SlashCmdList.QUESTLOGCOLLAPSE == ns.HandleSlashCommand)
     assert(globals.StaticPopupDialogs.QUESTLOGCOLLAPSE_NEW_PROFILE == ns.NewProfileDialog)
+    assert(globals.StaticPopupDialogs.QUESTLOGCOLLAPSE_DROP_GRAY)
     for key in pairs(globals.SlashCmdList) do assert(key == "QUESTLOGCOLLAPSE") end
-    for key in pairs(globals.StaticPopupDialogs) do assert(key == "QUESTLOGCOLLAPSE_NEW_PROFILE") end
+    for key in pairs(globals.StaticPopupDialogs) do
+        assert(key == "QUESTLOGCOLLAPSE_NEW_PROFILE" or key == "QUESTLOGCOLLAPSE_DROP_GRAY")
+    end
     ns.HandleSlashCommand("config")
-    assert(#categories == 5, "Opening settings duplicated registration")
+    assert(#categories == expectedCategories, "Opening settings duplicated registration")
 
     local enabled = originalProfile.enabled
     ns.HandleSlashCommand("toggle")
@@ -384,7 +395,7 @@ local function run(savedDB, savedCharDB)
     end
 end
 
-run()
+run(nil, nil, true)
 local profile = {
     enabled = false,
     debug = false,
@@ -393,7 +404,7 @@ local profile = {
 }
 local db = { profiles = { Default = {}, Existing = profile } }
 local charDB = { currentProfile = "Existing" }
-run(db, charDB)
+run(db, charDB, false)
 assert(db.profiles.Existing == profile)
 assert(profile.enabled == false and profile.dungeons.collapseCampaigns == false)
 assert(profile.combat == nil, "Legacy combat settings were not migrated")

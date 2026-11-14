@@ -27,6 +27,7 @@ profiles and `collapse*` setting keys remain compatible; `/qlc collapse` and
 - **Debug Mode**: Optional debug messages to track addon behavior
 - **Manual Control**: Commands to set configured sections to alpha 0 or restore all sections to alpha 1
 - **Show/Hide Button**: The on-screen `QLC Show/Hide` button toggles all available tracker sections, regardless of section settings
+- **Drop Gray Quests**: Abandon all eligible gray-difficulty quests after confirmation
 - **No Native Collapse Calls**: Alpha changes avoid the native collapse/expand update path; this is not a guarantee against all Blizzard taint bugs
 - **Lightweight**: Minimal performance impact with efficient event handling
 
@@ -47,7 +48,13 @@ The `QLC Show/Hide` button near the upper-right of the screen hides all availabl
 tracker sections or restores their opacity. It remains visible when sections
 are transparent. The button shows and hides sections immediately, including in
 combat; only protected mouse controls wait until combat ends. Layout space remains
-reserved. Right-drag the button to move it; its position is saved per character.
+reserved. Right-drag either button or the surrounding frame to move it; its
+position is saved per character.
+
+The `Drop Gray Quests` button finds abandonable gray-difficulty quests, including
+those under collapsed quest-log headers. Confirming abandons the listed count;
+quest progress and associated quest items may be lost. Hidden or non-abandonable
+quests are excluded, and the action is unavailable during combat.
 
 - `/qlc` or `/questlogcollapse` - Show help menu
 - `/qlc config` - Open the configuration panel (recommended)

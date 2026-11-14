@@ -28,7 +28,7 @@ QuestLogCollapse:RegisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
 local mapSystemBusy = false
 local mapSystemBusyUntil = 0
 local pendingOperations = {}
-local toggleButton
+local controlsFrame
 
 -- Shared tracker definitions used by all tracker operations.
 local TRACKER_DEFS = {
@@ -661,8 +661,8 @@ local function OnAddonLoaded(loadedAddonName)
     ns.InitializeConfigDB()
     local position = ns.charDB and ns.charDB.toggleButtonPosition
     if position then
-        toggleButton:ClearAllPoints()
-        toggleButton:SetPoint(position.point, UIParent, position.relativePoint, position.x, position.y)
+        controlsFrame:ClearAllPoints()
+        controlsFrame:SetPoint(position.point, UIParent, position.relativePoint, position.x, position.y)
     end
 
     -- Basic legacy fallback initialization - detailed profile config handled by config file.
@@ -1021,23 +1021,50 @@ function ns.HandleSlashCommand(msg)
     end
 end
 
-toggleButton = CreateFrame("Button", nil, UIParent, "UIPanelButtonTemplate")
-toggleButton:SetSize(110, 22)
-toggleButton:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -280, -180)
-toggleButton:SetText("QLC Show/Hide")
-toggleButton:SetMovable(true)
-toggleButton:SetClampedToScreen(true)
-toggleButton:RegisterForDrag("RightButton")
-toggleButton:SetScript("OnDragStart", function(self)
-    self:StartMoving()
-end)
-toggleButton:SetScript("OnDragStop", function(self)
-    self:StopMovingOrSizing()
-    local point, _, relativePoint, x, y = self:GetPoint()
+controlsFrame = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
+controlsFrame:SetSize(125, 45)
+controlsFrame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -280, -180)
+controlsFrame:SetBackdrop({
+    bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+    edgeSize = 8,
+    insets = { left = 2, right = 2, top = 2, bottom = 2 },
+})
+controlsFrame:SetBackdropColor(0, 0, 0, 0.6)
+controlsFrame:SetBackdropBorderColor(0.4, 0.4, 0.4, 0.8)
+controlsFrame:SetMovable(true)
+controlsFrame:SetClampedToScreen(true)
+controlsFrame:EnableMouse(true)
+
+local function StartControlsDrag()
+    controlsFrame:StartMoving()
+end
+
+local function StopControlsDrag()
+    controlsFrame:StopMovingOrSizing()
+    local point, _, relativePoint, x, y = controlsFrame:GetPoint()
     if ns.charDB then
         ns.charDB.toggleButtonPosition = { point = point, relativePoint = relativePoint, x = x, y = y }
     end
-end)
+end
+
+local function EnableControlsDrag(frame)
+    frame:RegisterForDrag("RightButton")
+    frame:SetScript("OnDragStart", StartControlsDrag)
+    frame:SetScript("OnDragStop", StopControlsDrag)
+end
+
+EnableControlsDrag(controlsFrame)
+
+local titleText = controlsFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+titleText:SetPoint("TOP", controlsFrame, "TOP", 0, -4)
+titleText:SetText("QLC")
+
+local toggleButton = CreateFrame("Button", nil, controlsFrame, "UIPanelButtonTemplate")
+toggleButton:SetSize(35, 22)
+toggleButton:SetPoint("BOTTOMLEFT", controlsFrame, "BOTTOMLEFT", 4, 4)
+toggleButton:SetText("S/H")
+EnableControlsDrag(toggleButton)
 toggleButton:SetScript("OnClick", function()
     if not isFullyLoaded then
         print("|cff00ff00QuestLogCollapse|r Tracker is not ready yet")
@@ -1083,6 +1110,97 @@ toggleButton:SetScript("OnClick", function()
         HideAllTrackers()
         if inCombat then
             print("|cff00ff00QuestLogCollapse|r Sections hidden; protected mouse controls will update after combat")
+        end
+    end
+end)
+
+local function CanDropGrayQuests()
+    return C_QuestLog and C_QuestLog.GetNumQuestLogEntries and C_QuestLog.GetInfo
+        and C_QuestLog.CanAbandonQuest and C_QuestLog.IsOnQuest
+        and C_QuestLog.GetSelectedQuest and C_QuestLog.SetSelectedQuest
+        and C_QuestLog.SetAbandonQuest and C_QuestLog.AbandonQuest
+        and C_PlayerInfo and C_PlayerInfo.GetContentDifficultyQuestForPlayer
+        and Enum and Enum.RelativeContentDifficulty and Enum.RelativeContentDifficulty.Trivial ~= nil
+        and ExpandQuestHeader and CollapseQuestHeader
+end
+
+local function IsDroppableGrayQuest(questID)
+    return C_QuestLog.IsOnQuest(questID) and C_QuestLog.CanAbandonQuest(questID)
+        and C_PlayerInfo.GetContentDifficultyQuestForPlayer(questID) == Enum.RelativeContentDifficulty.Trivial
+end
+
+local function FindGrayQuests()
+    local quests, collapsedHeaders = {}, {}
+    local i = 1
+    while i <= C_QuestLog.GetNumQuestLogEntries() do
+        local info = C_QuestLog.GetInfo(i)
+        if info and info.isHeader and info.isCollapsed then
+            collapsedHeaders[#collapsedHeaders + 1] = i
+            ExpandQuestHeader(i)
+        elseif info and not info.isHeader and not info.isHidden and info.questID
+            and IsDroppableGrayQuest(info.questID) then
+            quests[#quests + 1] = info.questID
+        end
+        i = i + 1
+    end
+    for index = #collapsedHeaders, 1, -1 do
+        CollapseQuestHeader(collapsedHeaders[index])
+    end
+    return quests
+end
+
+StaticPopupDialogs.QUESTLOGCOLLAPSE_DROP_GRAY = {
+    text = "Abandon %d gray quests? Quest progress and associated quest items may be lost.",
+    button1 = YES,
+    button2 = NO,
+    OnAccept = function(_, quests)
+        if InCombatLockdown() then
+            print("|cff00ff00QuestLogCollapse|r Cannot abandon quests during combat.")
+            return
+        end
+        if not CanDropGrayQuests() then
+            print("|cff00ff00QuestLogCollapse|r Quest abandonment is unavailable on this client.")
+            return
+        end
+        local selectedQuest = C_QuestLog.GetSelectedQuest()
+        local requested = 0
+        for _, questID in ipairs(quests) do
+            if IsDroppableGrayQuest(questID) then
+                C_QuestLog.SetSelectedQuest(questID)
+                C_QuestLog.SetAbandonQuest()
+                C_QuestLog.AbandonQuest()
+                requested = requested + 1
+            end
+        end
+        if selectedQuest and selectedQuest > 0 and C_QuestLog.IsOnQuest(selectedQuest) then
+            C_QuestLog.SetSelectedQuest(selectedQuest)
+        end
+        print("|cff00ff00QuestLogCollapse|r Requested abandonment of " .. requested .. " gray quests.")
+    end,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+    preferredIndex = 3,
+}
+
+local dropGrayButton = CreateFrame("Button", nil, controlsFrame, "UIPanelButtonTemplate")
+dropGrayButton:SetSize(80, 22)
+dropGrayButton:SetPoint("BOTTOMRIGHT", controlsFrame, "BOTTOMRIGHT", -4, 4)
+dropGrayButton:SetText("Drop Grays")
+EnableControlsDrag(dropGrayButton)
+dropGrayButton:SetScript("OnClick", function()
+    if not isFullyLoaded then
+        print("|cff00ff00QuestLogCollapse|r Quest log is not ready yet.")
+    elseif InCombatLockdown() then
+        print("|cff00ff00QuestLogCollapse|r Cannot abandon quests during combat.")
+    elseif not CanDropGrayQuests() then
+        print("|cff00ff00QuestLogCollapse|r Quest abandonment is unavailable on this client.")
+    else
+        local quests = FindGrayQuests()
+        if #quests == 0 then
+            print("|cff00ff00QuestLogCollapse|r No abandonable gray quests found.")
+        else
+            StaticPopup_Show("QUESTLOGCOLLAPSE_DROP_GRAY", #quests, nil, quests)
         end
     end
 end)

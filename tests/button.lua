@@ -8,6 +8,10 @@ end
 function methods:SetScript(event, callback) self.scripts[event] = callback end
 function methods:RegisterEvent(event) self.events[event] = true end
 function methods:SetSize() end
+function methods:SetBackdrop() end
+function methods:SetBackdropColor() end
+function methods:SetBackdropBorderColor() end
+function methods:EnableMouse() end
 function methods:SetPoint(...) self.point = { ... } end
 function methods:GetPoint() return unpack(self.point) end
 function methods:ClearAllPoints() self.point = nil end
@@ -31,22 +35,26 @@ function methods:EnableMouseWheel(enabled) assert(self:CanChangeProtectedState()
 function methods:SetCollapsed() error("Button must not call native collapse") end
 function methods:MarkDirty() error("Button must not trigger tracker layout") end
 
-local button
+local button, dropButton, controls
 local globals = setmetatable({
     SlashCmdList = {},
+    StaticPopupDialogs = {},
+    YES = "Yes", NO = "No",
     UIParent = frame(),
     QuestObjectiveTracker = frame(),
     CampaignQuestObjectiveTracker = frame(),
     ObjectiveTrackerFrame = frame(),
 }, { __index = _G })
 globals._G = globals
-globals.CreateFrame = function(_, name, _, template)
+globals.CreateFrame = function(_, name, parent, template)
     assert(name == nil)
     local result = frame()
     frames[#frames + 1] = result
     if template == "UIPanelButtonTemplate" then
-        assert(not button)
-        button = result
+        if not button then button = result else dropButton = result end
+        assert(parent == controls)
+    elseif template == "BackdropTemplate" then
+        controls = result
     end
     return result
 end
@@ -99,13 +107,13 @@ click()
 assert(quest:GetAlpha() == 1, "Button acted before the tracker was ready")
 event("ADDON_LOADED", "QuestLogCollapse")
 event("PLAYER_ENTERING_WORLD")
-assert(button.point[1] == "CENTER" and button.point[4] == 70 and button.point[5] == 40, "Saved button position was not restored")
-assert(button.dragButton == "RightButton" and button.clamped, "Button drag configuration missing")
+assert(controls.point[1] == "CENTER" and controls.point[4] == 70 and controls.point[5] == 40, "Saved button position was not restored")
+assert(button.dragButton == "RightButton" and dropButton.dragButton == "RightButton" and controls.clamped, "Frame drag configuration missing")
 button.scripts.OnDragStart(button)
-assert(button.moving, "Button did not start moving")
-button:SetPoint("TOPLEFT", globals.UIParent, "TOPLEFT", 120, -90)
+assert(controls.moving, "Frame did not start moving")
+controls:SetPoint("TOPLEFT", globals.UIParent, "TOPLEFT", 120, -90)
 button.scripts.OnDragStop(button)
-assert(not button.moving and ns.charDB.toggleButtonPosition.x == 120 and ns.charDB.toggleButtonPosition.y == -90, "Button position was not saved")
+assert(not controls.moving and ns.charDB.toggleButtonPosition.x == 120 and ns.charDB.toggleButtonPosition.y == -90, "Frame position was not saved")
 assert(quest:GetAlpha() == 1, "Dragging toggled section visibility")
 
 -- Button visibility changes do not wait for map activity.
@@ -204,4 +212,66 @@ assert(not protected.clicks and not protected.motion and not protected.wheel, "P
 inCombat = false
 event("PLAYER_REGEN_ENABLED")
 assert(protected.clicks and protected.motion and protected.wheel, "Protected input was not restored after combat")
+
+-- Gray quest selection includes collapsed headers, but excludes hidden and non-abandonable quests.
+local groups = {
+    { isHeader = true, isCollapsed = true, quests = {
+        { questID = 1 }, { questID = 2 }, { questID = 3, isHidden = true },
+    } },
+    { isHeader = true, isCollapsed = true, quests = {
+        { questID = 4 }, { questID = 5 }, { questID = 6 },
+    } },
+    { isHeader = true, isCollapsed = false, quests = { { questID = 7 } } },
+}
+local difficulties = { [1] = 0, [2] = 1, [3] = 0, [4] = 0, [5] = 0, [6] = 0, [7] = 1 }
+local onQuest = { [1] = true, [2] = true, [3] = true, [4] = true, [5] = true, [6] = true, [7] = true }
+local canAbandon = { [1] = true, [2] = true, [3] = true, [4] = true, [5] = false, [6] = true, [7] = true }
+local selected, abandon, dropped, popup = 2, nil, {}, nil
+local function entries()
+    local result = {}
+    for _, group in ipairs(groups) do
+        result[#result + 1] = group
+        if not group.isCollapsed then
+            for _, item in ipairs(group.quests) do result[#result + 1] = item end
+        end
+    end
+    return result
+end
+globals.C_QuestLog = {
+    GetNumQuestLogEntries = function() return #entries() end,
+    GetInfo = function(index) return entries()[index] end,
+    CanAbandonQuest = function(id) return canAbandon[id] end,
+    IsOnQuest = function(id) return onQuest[id] end,
+    GetSelectedQuest = function() return selected end,
+    SetSelectedQuest = function(id) selected = id end,
+    SetAbandonQuest = function() abandon = selected end,
+    AbandonQuest = function() dropped[#dropped + 1] = abandon; onQuest[abandon] = false end,
+}
+globals.C_PlayerInfo = { GetContentDifficultyQuestForPlayer = function(id) return difficulties[id] end }
+globals.Enum = { RelativeContentDifficulty = { Trivial = 0 } }
+globals.ExpandQuestHeader = function(index) entries()[index].isCollapsed = false end
+globals.CollapseQuestHeader = function(index) entries()[index].isCollapsed = true end
+globals.StaticPopup_Show = function(name, count, _, data) popup = { name = name, count = count, quests = data } end
+
+dropButton.scripts.OnClick()
+assert(popup and popup.count == 3, "Wrong gray quest count")
+assert(groups[1].isCollapsed and groups[2].isCollapsed and not groups[3].isCollapsed, "Quest header states changed")
+assert(#dropped == 0, "Quests abandoned without confirmation")
+local dialog = globals.StaticPopupDialogs[popup.name]
+difficulties[4] = 1
+onQuest[6] = false
+dialog.OnAccept(nil, popup.quests)
+assert(#dropped == 1 and dropped[1] == 1, "Confirmation did not recheck selected quests")
+assert(selected == 2, "Previous quest selection was not restored")
+
+popup = nil
+inCombat = true
+dropButton.scripts.OnClick()
+assert(not popup, "Drop button opened confirmation in combat")
+dialog.OnAccept(nil, { 4 })
+assert(#dropped == 1, "Confirmation abandoned quests in combat")
+inCombat = false
+canAbandon[1] = false
+dropButton.scripts.OnClick()
+assert(not popup, "Empty gray quest list opened confirmation")
 print("Show/hide button checks passed")

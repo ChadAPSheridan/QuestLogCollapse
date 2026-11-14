@@ -104,7 +104,7 @@ local defaults = {
 if WOW_PROJECT_ID == WOW_PROJECT_MAINLINE then
     -- Append legacy instance types for retail WoW (garrisons, class halls, quest tables)
     -- These are not used in Classic WoW, so they are omitted from the defaults table there.
-    table.insert(defaults, {
+    local retailDefaults = {
         garrisons = {
             enabled = false,
             collapseQuests = false,
@@ -175,7 +175,10 @@ if WOW_PROJECT_ID == WOW_PROJECT_MAINLINE then
             collapseWorldQuests = false,
             namePlates = { enabled = false },
         }
-    })
+    }
+    for key, value in pairs(retailDefaults) do
+        defaults[key] = value
+    end
 end
 
 local function DeepCopy(source)
@@ -512,8 +515,9 @@ local pvpTypes = {
         contextTip = "Applied when you enter a PvP arena."
     },
 }
+local housingTypes, legacyTypes
 if WOW_PROJECT_ID == WOW_PROJECT_MAINLINE then
-    local housingTypes = {
+    housingTypes = {
         {
             key = "neighbourhood",
             name = "Neighbourhood",
@@ -527,7 +531,7 @@ if WOW_PROJECT_ID == WOW_PROJECT_MAINLINE then
             contextTip = "Applied inside your Player House."
         },
     }
-    local legacyTypes = {
+    legacyTypes = {
         {
             key = "garrisons",
             name = "Garrisons",
@@ -875,9 +879,10 @@ configEventFrame:SetScript("OnEvent", function(self, event)
             local basicOpts    = CreateBasicOptionsPanel()
             local instPanel    = BuildContainerPanel("Instances", instanceTypes, false)
             local pvpPanel     = BuildContainerPanel("PvP", pvpTypes, false)
+            local housingPanel, legacyPanel
             if WOW_PROJECT_ID == WOW_PROJECT_MAINLINE then
-                local housingPanel = BuildContainerPanel("Housing", housingTypes, false)
-                local legacyPanel  = BuildContainerPanel("Legacy", legacyTypes, true)
+                housingPanel = BuildContainerPanel("Housing", housingTypes, false)
+                legacyPanel = BuildContainerPanel("Legacy", legacyTypes, true)
             end
 
             allPanels          = { basicOpts, instPanel, pvpPanel}
