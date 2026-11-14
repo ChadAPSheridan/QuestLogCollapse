@@ -21,10 +21,25 @@ function methods:RegisterForDrag(mouseButton) self.dragButton = mouseButton end
 function methods:StartMoving() assert(self.movable); self.moving = true end
 function methods:StopMovingOrSizing() self.moving = false end
 function methods:SetText(text) self.text = text end
+function methods:SetTexture(texture) self.texture = texture end
+function methods:SetColorTexture(...) self.color = { ... } end
+function methods:SetRotation(rotation) self.rotation = rotation end
+function methods:Show() self.shown = true end
+function methods:Hide() self.shown = false end
+function methods:CreateTexture()
+    local result = frame()
+    self.children[#self.children + 1] = result
+    return result
+end
 function methods:SetAlpha(alpha) self.alpha = alpha end
 function methods:GetAlpha() return self.alpha end
 function methods:GetChildren() return unpack(self.children) end
 function methods:GetRegions() end
+function methods:CreateFontString()
+    local result = frame()
+    self.children[#self.children + 1] = result
+    return result
+end
 function methods:IsMouseClickEnabled() return self.clicks or false end
 function methods:IsMouseMotionEnabled() return self.motion or false end
 function methods:IsMouseWheelEnabled() return self.wheel or false end
@@ -97,6 +112,13 @@ local function click()
     assert(button and button.scripts.OnClick, "Show/hide button not created")
     button.scripts.OnClick(button)
 end
+local function assertToggleIcon(hidden)
+    local icon = button.children[1]
+    local expected = hidden
+        and "Interface\\Icons\\inv_helm_armor_pirateeyepatch_b_01_black"
+        or "Interface\\Icons\\inv_darkmoon_eye"
+    assert(icon and icon.texture == expected, "Eye icon does not match tracker visibility")
+end
 
 local quest, campaign = globals.QuestObjectiveTracker, globals.CampaignQuestObjectiveTracker
 local child = frame()
@@ -119,9 +141,11 @@ assert(quest:GetAlpha() == 1, "Dragging toggled section visibility")
 -- Button visibility changes do not wait for map activity.
 click()
 assert(quest:GetAlpha() == 0 and campaign:GetAlpha() == 0, "Button did not hide all sections")
+assertToggleIcon(true)
 assert(not child.clicks and not child.motion, "Hidden section still accepts mouse input")
 click()
 assert(quest:GetAlpha() == 1 and campaign:GetAlpha() == 1, "Map activity blocked button visibility")
+assertToggleIcon(false)
 assert(child.clicks and child.motion, "Mouse input was not restored")
 click()
 now = 16

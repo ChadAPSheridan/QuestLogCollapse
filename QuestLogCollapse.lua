@@ -1,8 +1,8 @@
 -- QuestLogCollapse: Automatically fades quest tracker sections when entering instances
 -- Author: Gaspode
 -- Contributors: Artherion77
--- Version: 1.7.0
--- Updated: 2026-11-09
+-- Version: 1.7.1
+-- Updated: 2026-11-13
 
 -- TAINT PROTECTION STRATEGY:
 -- Implemented namespace to avoid global variable pollution
@@ -10,7 +10,7 @@
 
 -- Use addon namespace to prevent global variable pollution and taint
 local addonName, ns = ...
-local ADDON_VERSION = "1.7.0"
+local ADDON_VERSION = "1.7.1"
 
 -- Create addon frame (local to prevent global pollution)
 local QuestLogCollapse = CreateFrame("Frame")
@@ -1061,9 +1061,15 @@ titleText:SetPoint("TOP", controlsFrame, "TOP", 0, -4)
 titleText:SetText("QLC")
 
 local toggleButton = CreateFrame("Button", nil, controlsFrame, "UIPanelButtonTemplate")
-toggleButton:SetSize(35, 22)
+toggleButton:SetSize(28, 22)
 toggleButton:SetPoint("BOTTOMLEFT", controlsFrame, "BOTTOMLEFT", 4, 4)
-toggleButton:SetText("S/H")
+toggleButton:SetText("")
+local showIconPath = "Interface\\Icons\\inv_darkmoon_eye"
+local hideIconPath = "Interface\\Icons\\inv_helm_armor_pirateeyepatch_b_01_black"
+local toggleIcon = toggleButton:CreateTexture(nil, "ARTWORK")
+toggleIcon:SetTexture(showIconPath)
+toggleIcon:SetSize(16, 16)
+toggleIcon:SetPoint("CENTER")
 EnableControlsDrag(toggleButton)
 toggleButton:SetScript("OnClick", function()
     if not isFullyLoaded then
@@ -1103,11 +1109,13 @@ toggleButton:SetScript("OnClick", function()
 
     if shouldShow then
         ShowAllTrackers()
+        toggleIcon:SetTexture(showIconPath)
         if inCombat then
             print("|cff00ff00QuestLogCollapse|r Sections shown; protected mouse controls will update after combat")
         end
     else
         HideAllTrackers()
+        toggleIcon:SetTexture(hideIconPath)
         if inCombat then
             print("|cff00ff00QuestLogCollapse|r Sections hidden; protected mouse controls will update after combat")
         end

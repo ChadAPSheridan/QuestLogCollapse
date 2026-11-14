@@ -26,7 +26,7 @@ profiles and `collapse*` setting keys remain compatible; `/qlc collapse` and
 - **Nameplate Integration**: Optional nameplate management for different instance types
 - **Debug Mode**: Optional debug messages to track addon behavior
 - **Manual Control**: Commands to set configured sections to alpha 0 or restore all sections to alpha 1
-- **Show/Hide Button**: The on-screen `QLC Show/Hide` button toggles all available tracker sections, regardless of section settings
+- **Show/Hide Button**: The on-screen eye button toggles all available tracker sections, regardless of section settings; the slash indicates hidden sections
 - **Drop Gray Quests**: Abandon all eligible gray-difficulty quests after confirmation
 - **No Native Collapse Calls**: Alpha changes avoid the native collapse/expand update path; this is not a guarantee against all Blizzard taint bugs
 - **Lightweight**: Minimal performance impact with efficient event handling
@@ -44,7 +44,7 @@ profiles and `collapse*` setting keys remain compatible; `/qlc collapse` and
 
 The addon provides several slash commands for basic control:
 
-The `QLC Show/Hide` button near the upper-right of the screen hides all available
+The eye button near the upper-right of the screen hides all available
 tracker sections or restores their opacity. It remains visible when sections
 are transparent. The button shows and hides sections immediately, including in
 combat; only protected mouse controls wait until combat ends. Layout space remains
