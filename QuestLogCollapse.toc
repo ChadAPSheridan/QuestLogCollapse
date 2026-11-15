@@ -3,8 +3,8 @@
 ## Notes: Automatically makes configured quest tracker sections transparent in instances
 ## Author: Gaspode
 ## Contributors: Artherion77
-## Version: 1.7.1
-## Updated: 2026-11-13
+## Version: 1.7.2
+## Updated: 2026-11-15
 
 ## SavedVariables: QuestLogCollapseDB
 ## SavedVariablesPerCharacter: QuestLogCollapseCharDB

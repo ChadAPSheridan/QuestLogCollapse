@@ -212,7 +212,7 @@ Run `lua5.1 tests/button.lua` to check the standalone show/hide button and its q
 
 ## Compatibility
 
-- **WoW Version**: Compatible with retail World of Warcraft (Interface 120000, 120001, 120500, 120700)
+- **WoW Version**: Compatible with retail World of Warcraft Retail and Forever
 - **Dependencies**: None - this is a standalone addon
 - **Conflicts**: Should not conflict with other quest log or UI addons
 
@@ -291,6 +291,15 @@ Feel free to submit issues, feature requests, or pull requests to improve this a
 This project is open source. Feel free to modify and distribute as needed.
 
 ## Changelog
+
+### Version 1.7.2
+
+- Added `/qlc config` to combat queue system to prevent taint errors.
+- Clarified some language in options pane.
+
+### Version 1.7.1
+
+- Added Drop Gray Quests button to configuration panel to abandon all eligible gray-difficulty quests after confirmation.
 
 ### Version 1.7.0
 

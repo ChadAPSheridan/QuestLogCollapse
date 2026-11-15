@@ -1,8 +1,8 @@
 -- QuestLogCollapse Configuration Panel
 -- Author: Gaspode
 -- Contributors: Artherion77 (significant ui revamp in 1.4.0)
--- Version: 1.7.1
--- Updated: 2026-11-13
+-- Version: 1.7.2
+-- Updated: 2026-11-15
 
 -- WOW FOREVER'S PROJECT ID IS: 18
 
@@ -412,7 +412,7 @@ local function BuildContainer(parent, instanceInfo, yTopLeft, isLegacy)
     -- "Active" (enabled) checkbox
     local typeEnabledCheck = CreateFrame("CheckButton", nil, container, "InterfaceOptionsCheckButtonTemplate")
     typeEnabledCheck:SetPoint("TOPLEFT", container, "TOPLEFT", 148, -4)
-    typeEnabledCheck.Text:SetText("Active")
+    typeEnabledCheck.Text:SetText("Enable Collapsing of the selected Quest Tracker Sections:")
     typeEnabledCheck.key = instanceInfo.key
     Tip(typeEnabledCheck, "Activate for " .. instanceInfo.name,
         instanceInfo.contextTip or ("Apply these settings when you enter " .. instanceInfo.name .. "."),
@@ -780,7 +780,7 @@ local function CreateBasicOptionsPanel()
 
     local defaultSettingsHeader = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     defaultSettingsHeader:SetPoint("TOPLEFT", sep2, "BOTTOMLEFT", 0, -8)
-    defaultSettingsHeader:SetText("DEFAULT SETTINGS")
+    defaultSettingsHeader:SetText("DEFAULT SETTINGS - applied when no instance-specific settings are active")
     defaultSettingsHeader:SetTextColor(0.6, 0.6, 0.6)
 
     -- yTopLeft computed from: profile(~26) + sep1(1) + enable(26) + zfHeader(14) + filter(26) + sep2(1) + gap(8) + header(14) + gap(6) ≈ 163

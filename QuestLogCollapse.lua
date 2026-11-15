@@ -1,8 +1,8 @@
 -- QuestLogCollapse: Automatically fades quest tracker sections when entering instances
 -- Author: Gaspode
 -- Contributors: Artherion77
--- Version: 1.7.1
--- Updated: 2026-11-13
+-- Version: 1.7.2
+-- Updated: 2026-11-15
 
 -- TAINT PROTECTION STRATEGY:
 -- Implemented namespace to avoid global variable pollution
@@ -10,7 +10,7 @@
 
 -- Use addon namespace to prevent global variable pollution and taint
 local addonName, ns = ...
-local ADDON_VERSION = "1.7.1"
+local ADDON_VERSION = "1.7.2"
 
 -- Create addon frame (local to prevent global pollution)
 local QuestLogCollapse = CreateFrame("Frame")
@@ -708,6 +708,10 @@ local function OnCombatStateChanged(event)
             DebugPrint("Applying queued opacity restoration after combat")
             ExpandQuestLog()
             combatStateQueue.shouldExpandOnCombatEnd = false
+        elseif combatStateQueue.shouldOpenConfigAfterCombat then
+            DebugPrint("Opening configuration panel after combat")
+            ns.OpenConfigPanel()
+            combatStateQueue.shouldOpenConfigAfterCombat = false
         end
     elseif event == "PLAYER_REGEN_DISABLED" then
         local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or ns.db
@@ -832,6 +836,13 @@ function ns.HandleSlashCommand(msg)
             print("|cff00ff00QuestLogCollapse|r debug " .. (profile.debug and "enabled" or "disabled"))
         end
     elseif args[1] == "config" then
+        if InCombatLockdown() then
+            -- Avoid opening config panel during combat to prevent taint, defer until combat ends
+            print("|cff00ff00QuestLogCollapse|r Cannot open configuration panel during combat. Please wait until combat ends.")
+            -- add a flag to open the config panel after combat ends
+            combatStateQueue.shouldOpenConfigAfterCombat = true
+            return
+        end
         if ns.CreateQuestLogCollapseConfigPanel then
             local configPanel = ns.CreateQuestLogCollapseConfigPanel()
             if Settings and Settings.OpenToCategory then
