@@ -2,9 +2,9 @@
 
 A World of Warcraft addon that automatically makes configured objective tracker sections transparent when entering instances.
 Optionally can filter quests to current zone (triggered by user actions to avoid taint).
-**Please Note: This addon targets current Retail builds (Interface 120000/120001/120500/120700).**
+**Please Note: This addon targets current Retail and Forever.**
 
-Sections use alpha **0** for transparent and **1** for opaque instead of calling
+Sections use alpha **0*- for transparent and **1*- for opaque instead of calling
 Blizzard's collapse/expand methods. Their layout space and native collapsed state
 are unchanged. Mouse clicks, hover and wheel input are disabled for transparent
 sections and restored when they become opaque or frames leave the section.
@@ -21,13 +21,13 @@ profiles and `collapse*` setting keys remain compatible; `/qlc collapse` and
 - **Default Settings**: Settings used when no instance-specific settings apply, including in combat
 - **Individual Section Control**: Choose which objective tracker sections become transparent (quests, achievements, bonus objectives, etc.)
 - **Character-Specific Profiles**: Settings saved per character with support for multiple profiles
-- **GUI Configuration**: Easy-to-use configuration panel accessible via `/qlc config`
+- **GUI Configuration**: Easy-to-use configuration panel accessible via `/qlc config` (protected during combat to prevent taint errors)
 - **Combat Handling**: Configured sections become transparent on combat entry and return to their prior alpha afterward; manual commands are deferred
 - **Nameplate Integration**: Optional nameplate management for different instance types
 - **Debug Mode**: Optional debug messages to track addon behavior
 - **Manual Control**: Commands to set configured sections to alpha 0 or restore all sections to alpha 1
-- **Show/Hide Button**: The on-screen eye button toggles all available tracker sections, regardless of section settings; the slash indicates hidden sections
-- **Drop Gray Quests**: Abandon all eligible gray-difficulty quests after confirmation
+- **Show/Hide Button**: A moveable on-screen eye button to override the current state when needed
+- **Drop Gray Quests**: Abandon all eligible gray-difficulty quests after confirmation via a dedicated button in the configuration panel
 - **No Native Collapse Calls**: Alpha changes avoid the native collapse/expand update path; this is not a guarantee against all Blizzard taint bugs
 - **Lightweight**: Minimal performance impact with efficient event handling
 
@@ -37,6 +37,7 @@ profiles and `collapse*` setting keys remain compatible; `/qlc collapse` and
 2. Copy the `QuestLogCollapse` folder to your World of Warcraft addons directory:
    - **Windows**: `World of Warcraft\_retail_\Interface\AddOns\`
    - **macOS**: `Applications/World of Warcraft/_retail_/Interface/AddOns/`
+   - **Linux**: `/path/to/.wine/drive_c/Program Files (x86)/World of Warcraft/_retail_/Interface/AddOns/`
 3. Restart World of Warcraft or reload your UI (`/reload`)
 4. The addon will automatically load and display a confirmation message
 
@@ -93,7 +94,7 @@ The addon features a comprehensive configuration panel accessible via `/qlc conf
 
 ### Instance Type Settings
 
-Configure different behaviors for each type of instance. **Default Settings** are used when no instance-specific settings apply, including on combat entry.
+Configure different behaviors for each type of instance. **Default Settings*- are used when no instance-specific settings apply, including on combat entry.
 
 - **Default Settings**: Fallback settings outside recognized instance contexts
 - **Dungeons**: 5-player group content
@@ -126,6 +127,7 @@ For each instance type, choose which objective tracker sections become transpare
 
 - **Nameplate Control**: Show enemy nameplates according to each zone type's setting; restore your original setting when the active zone type does not request them
 - **Profile Management**: Create, switch, and manage multiple configuration profiles
+- **Drop Gray Quests**: Dedicated configuration button to abandon all eligible gray-difficulty quests after confirmation
 
 ## How It Works
 
@@ -180,11 +182,11 @@ QuestLogCollapse/
 
 To avoid taint issues with protected quest tracking functions, zone filtering is triggered by user-initiated actions:
 
-- **Quest Tracker Interaction** - Triggers when you interact with the objective tracker
-- **Player Movement** - Triggers when you start moving after a zone change
-- **Spell/Ability Use** - Triggers when you cast any spell or ability (including dynamic flight abilities)
-- **Mounting/Dismounting** - Triggers when your mount state changes
-- **Manual Command** - Use `/qlc filterzone` to trigger anytime
+- **Quest Tracker Interaction*- - Triggers when you interact with the objective tracker
+- **Player Movement*- - Triggers when you start moving after a zone change
+- **Spell/Ability Use*- - Triggers when you cast any spell or ability (including dynamic flight abilities)
+- **Mounting/Dismounting*- - Triggers when your mount state changes
+- **Manual Command*- - Use `/qlc filterzone` to trigger anytime
 
 ### Database Structure
 
@@ -212,7 +214,8 @@ Run `lua5.1 tests/button.lua` to check the standalone show/hide button and its q
 
 ## Compatibility
 
-- **WoW Version**: Compatible with retail World of Warcraft Retail and Forever
+- **WoW Version**: Compatible with retail World of Warcraft and World of Warcraft Forever
+
 - **Dependencies**: None - this is a standalone addon
 - **Conflicts**: Should not conflict with other quest log or UI addons
 
@@ -229,7 +232,7 @@ Run `lua5.1 tests/button.lua` to check the standalone show/hide button and its q
 
 ### Default Settings Not Being Used
 
-1. Open `/qlc config` and review the **Default Settings** section.
+1. Open `/qlc config` and review the **Default Settings*- section.
 2. Confirm that Default Settings are active and that the desired sections are enabled.
 3. Instance-specific settings take precedence in recognized instances.
 
@@ -278,8 +281,8 @@ Enable debug mode with `/qlc debug` to see detailed information about:
 
 ## CONTRIBUTORS
 
-- **Gaspode** - Original author and maintainer
-- **Artherion77** - UI configuration panel revamp and usability improvements
+- **Gaspode*- - Original author and maintainer
+- **Artherion77*- - UI configuration panel revamp and usability improvements
 
 ## Contributing
 
@@ -295,6 +298,7 @@ This project is open source. Feel free to modify and distribute as needed.
 ### Version 1.7.2
 
 - Added `/qlc config` to combat queue system to prevent taint errors.
+
 - Clarified some language in options pane.
 
 ### Version 1.7.1
@@ -308,7 +312,9 @@ This project is open source. Feel free to modify and distribute as needed.
 ### Version 1.6.2
 
 - Updated compatible version to include World of Warcraft Forever (Interface 16001)
+
 - Updated documentation to reflect new compatible version
+
 - Changed collapse/expand commands to include disabling mouse input on transparent sections outside combat, and restoring input when sections become opaque or leave the section
 
 ### Version 1.6.1
@@ -318,6 +324,7 @@ This project is open source. Feel free to modify and distribute as needed.
 ### Version 1.5.7
 
 - Tightened up namespacing and added more error handling to prevent taint issues
+
 - Added tests for namespace isolation, saved-variable identity, settings registration, and deferred operations with a mocked WoW environment.
 
 ### Version 1.5.6
@@ -327,12 +334,15 @@ This project is open source. Feel free to modify and distribute as needed.
 ### Verion 1.5.5
 
 - Added `/qlc diag` command for concise diagnostics (profile, context, queue, blacklist, trigger source)
+
 - Improved debug logging for zone filtering triggers and combat queue operations
+
 - hopefully fixed remaining taint issues with zone filtering and combat queue operations
 
 ### Version 1.5.4
 
 - Fixed World Map visibility monitoring for zone filtering (non-taint approach)
+
 - Improved debug logging for zone filtering triggers
 
 ### Version 1.5.3
@@ -342,6 +352,7 @@ This project is open source. Feel free to modify and distribute as needed.
 ### Version 1.5.2
 
 - Use securecall for tracker collapse and expand paths instead of direct calls to protected functions.
+
 - This should eliminate any remaining taint issues with tracker collapse/expand operations.
 
 ### Version 1.4.1
@@ -351,8 +362,11 @@ This project is open source. Feel free to modify and distribute as needed.
 ### Version 1.4.0
 
 - Significant code refactor and optimization for better performance and maintainability
+
 - **Significant UI Revamp**: Updated configuration panel with improved layout and usability (courtesy of Artherion77)
+
 - Updated documentation to reflect new zone filtering system and UI changes
+
 - Updated compatible version
 
 ### Version 1.3.2
@@ -362,66 +376,101 @@ This project is open source. Feel free to modify and distribute as needed.
 ### Version 1.3.1
 
 - **Zone Filtering Taint Fix**: Completely redesigned zone filtering to use hybrid trigger system
-  - Zone changes set a flag instead of immediately calling protected functions
-  - Filter automatically triggers on user actions (opening map, moving, using abilities, mount/unmount, quest tracker interaction)
-  - Added `/qlc filterzone` command for manual triggering
-  - Eliminates `ADDON_ACTION_BLOCKED` errors from quest tracking operations
-  - Now fully compatible with WoW's taint protection system
+
+- Zone changes set a flag instead of immediately calling protected functions
+
+- Filter automatically triggers on user actions (opening map, moving, using abilities, mount/unmount, quest tracker interaction)
+
+- Added `/qlc filterzone` command for manual triggering
+
+- Eliminates `ADDON_ACTION_BLOCKED` errors from quest tracking operations
+
+- Now fully compatible with WoW's taint protection system
+
 - **Enhanced Documentation**: Updated README with clear explanation of zone filtering triggers
 
 ### Version 1.3
 
-- **Taint Issues Resolved!!!:** Implemented [namespacing](https://warcraft.wiki.gg/wiki/Using_the_AddOn_namespace) throughout entire addon to resolve secret variable taint issues.
+- **Taint Issues Resolved!!!:*- Implemented [namespacing](https://warcraft.wiki.gg/wiki/Using_the_AddOn_namespace) throughout entire addon to resolve secret variable taint issues.
+
 - If this completely resolves taint issues, will remove previous mitigation strategies (disabling collapsing of certain trackers, setting delays etc.) in the next update, but wanted to get this into user's hands asap.
 
 ### Version 1.2.7
 
 - **Zone Filtering Added**: You can now enable the option to have quests tracked and untracked based on your current zone.
+
 - **Error Handling Updates**: Added more error handling in a further attempt to catch those pesky taint errors before they escape.
+
 - **Documentation Updates & Fixes**: Configuration is now all listed in one area.
 
 ### Verion 1.2.6
 
 - **New Instance Types Supported**: QLC now has configurable support for Garrisons, Class Halls, Quest Tables, Neighbourhoods, and House Interiors!
+
 - **Passive Garbage Collection**: In some rare situations (ie. repeated entering and exiting combat in a non-instance with other, non-contained combat/location tracking addons installed) the state tracking was balooning in memory footprint. Added non-intrusive GC to address.
-  
+
 ### Version 1.2.3
 
 - **Automatic Quest Log Expansion**: Quest trackers now automatically expand when combat ends (only if they were collapsed during combat)
+
 - **Smart State Tracking**: Added tracking to determine which trackers were collapsed during combat for intelligent restoration
+
 - **Enhanced Combat Flow**: Complete combat cycle - collapse on enter, expand on exit (outside instances)
+
 - **Improved State Management**: Better handling of combat state when collapse is disabled or no trackers are affected
+
 - **Enhanced Debug Information**: Added tracker collapse state to status and test commands
 
 ### Version 1.2.0
 
 - **Early Combat Detection**: Added `PLAYER_ENTER_COMBAT` event for earliest possible quest tracker collapse
+
 - **Dual-Layer Combat System**: Early detection + fallback system for maximum reliability
+
 - **Improved Success Rate**: Better chance of collapsing trackers before taint protection activates
+
 - **Enhanced Debug Logging**: Better tracking of early vs. fallback combat detection
+
 - **Reduced Taint Risk**: Earlier event handling reduces reliance on protected functions during combat
 
 ### Version 1.1.0
 
 - **Enhanced Combat Collapse**: Quest trackers now attempt immediate collapse when entering combat
+
 - **Improved Combat Handling**: Added fallback queuing system when immediate collapse fails due to taint protection
+
 - **New Test Command**: Added `/qlc testcombat` to test combat settings and tracker availability
+
 - **Better User Feedback**: Enhanced debug messages for immediate vs. queued combat operations
+
 - **World Quest Support**: Added world quest tracker support to immediate combat collapse
 
 ### Version 1.0.0
 
 - Initial release with comprehensive functionality
+
 - Automatic quest log collapse/expand based on instance entry/exit
+
 - Combat collapse support with smart queue system
+
 - Multiple instance type support (combat, dungeons, raids, scenarios, battlegrounds, arenas)
+
 - Individual objective tracker section control
+
 - Character-specific profile system
+
 - GUI configuration panel with scrollable interface
+
 - Nameplate integration for instance types
+
 - Combat queue system to prevent addon taint
+
 - Protected function error handling
+
 - Comprehensive slash command interface
+
 - Debug mode with detailed logging
+
 - Manual override capabilities
+
 - Settings migration and profile management
