@@ -1,7 +1,7 @@
 -- QuestLogCollapse: Automatically fades quest tracker sections when entering instances
 -- Author: Gaspode
 -- Contributors: Artherion77
--- Version: 1.7.2
+-- Version: 1.7.3
 -- Updated: 2026-11-15
 
 -- TAINT PROTECTION STRATEGY:
@@ -10,7 +10,7 @@
 
 -- Use addon namespace to prevent global variable pollution and taint
 local addonName, ns = ...
-local ADDON_VERSION = "1.7.2"
+local ADDON_VERSION = "1.7.3"
 
 -- Create addon frame (local to prevent global pollution)
 local QuestLogCollapse = CreateFrame("Frame")
@@ -32,26 +32,106 @@ local controlsFrame
 
 -- Shared tracker definitions used by all tracker operations.
 local TRACKER_DEFS = {
-    { name = "Quest",              label = "Quests",             settingKey = "collapseQuests",            supportsImmediate = true, getter = function() return
-        QuestObjectiveTracker end },
-    { name = "Achievement",        label = "Achievements",       settingKey = "collapseAchievements",      supportsImmediate = true, getter = function() return
-        AchievementObjectiveTracker end },
-    { name = "Bonus objectives",   label = "Bonus Objectives",   settingKey = "collapseBonusObjectives",   supportsImmediate = true, getter = function() return
-        BonusObjectiveTracker end },
-    { name = "Scenario",           label = "Scenarios",          settingKey = "collapseScenarios",         supportsImmediate = true, getter = function() return
-        ScenarioObjectiveTracker end },
-    { name = "Campaign",           label = "Campaigns",          settingKey = "collapseCampaigns",         supportsImmediate = true, getter = function() return
-        CampaignQuestObjectiveTracker end },
-    { name = "Professions",        label = "Professions",        settingKey = "collapseProfessions",       supportsImmediate = true, getter = function() return
-        ProfessionsRecipeTracker end },
-    { name = "Monthly activities", label = "Monthly Activities", settingKey = "collapseMonthlyActivities", supportsImmediate = true, getter = function() return
-        MonthlyActivitiesObjectiveTracker end },
-    { name = "UI widgets",         label = "UI Widgets",         settingKey = "collapseUIWidgets",         supportsImmediate = true, getter = function() return
-        UIWidgetObjectiveTracker end },
-    { name = "Adventure map",      label = "Adventure Maps",     settingKey = "collapseAdventureMaps",     supportsImmediate = true, getter = function() return
-        _G["AdventureMapQuestObjectiveTracker"] end },
-    { name = "World quest",        label = "World Quests",       settingKey = "collapseWorldQuests",       supportsImmediate = true, getter = function() return
-        WorldQuestObjectiveTracker end },
+    {
+        name = "Quest",
+        label = "Quests",
+        settingKey = "collapseQuests",
+        supportsImmediate = true,
+        getter = function()
+            return
+                QuestObjectiveTracker
+        end
+    },
+    {
+        name = "Achievement",
+        label = "Achievements",
+        settingKey = "collapseAchievements",
+        supportsImmediate = true,
+        getter = function()
+            return
+                AchievementObjectiveTracker
+        end
+    },
+    {
+        name = "Bonus objectives",
+        label = "Bonus Objectives",
+        settingKey = "collapseBonusObjectives",
+        supportsImmediate = true,
+        getter = function()
+            return
+                BonusObjectiveTracker
+        end
+    },
+    {
+        name = "Scenario",
+        label = "Scenarios",
+        settingKey = "collapseScenarios",
+        supportsImmediate = true,
+        getter = function()
+            return
+                ScenarioObjectiveTracker
+        end
+    },
+    {
+        name = "Campaign",
+        label = "Campaigns",
+        settingKey = "collapseCampaigns",
+        supportsImmediate = true,
+        getter = function()
+            return
+                CampaignQuestObjectiveTracker
+        end
+    },
+    {
+        name = "Professions",
+        label = "Professions",
+        settingKey = "collapseProfessions",
+        supportsImmediate = true,
+        getter = function()
+            return
+                ProfessionsRecipeTracker
+        end
+    },
+    {
+        name = "Monthly activities",
+        label = "Monthly Activities",
+        settingKey = "collapseMonthlyActivities",
+        supportsImmediate = true,
+        getter = function()
+            return
+                MonthlyActivitiesObjectiveTracker
+        end
+    },
+    {
+        name = "UI widgets",
+        label = "UI Widgets",
+        settingKey = "collapseUIWidgets",
+        supportsImmediate = true,
+        getter = function()
+            return
+                UIWidgetObjectiveTracker
+        end
+    },
+    {
+        name = "Adventure map",
+        label = "Adventure Maps",
+        settingKey = "collapseAdventureMaps",
+        supportsImmediate = true,
+        getter = function()
+            return
+                _G["AdventureMapQuestObjectiveTracker"]
+        end
+    },
+    {
+        name = "World quest",
+        label = "World Quests",
+        settingKey = "collapseWorldQuests",
+        supportsImmediate = true,
+        getter = function()
+            return
+                WorldQuestObjectiveTracker
+        end
+    },
 }
 local TRACKER_DEF_BY_NAME = {}
 for _, def in ipairs(TRACKER_DEFS) do
@@ -490,7 +570,7 @@ local function FilterQuestsByZone()
             local hasLocalMarker = questInfo and questInfo.hasLocalPOI
 
             DebugPrint("  Quest " ..
-            questID .. ": isOnMap=" .. tostring(isOnCurrentMap) .. ", hasLocalPOI=" .. tostring(hasLocalMarker))
+                questID .. ": isOnMap=" .. tostring(isOnCurrentMap) .. ", hasLocalPOI=" .. tostring(hasLocalMarker))
 
             if isOnCurrentMap or hasLocalMarker then
                 return true, "has objectives/markers in current zone"
@@ -561,7 +641,7 @@ local function FilterQuestsByZone()
                 local questID = info.questID
                 if questID then
                     DebugPrint("Checking quest log entry " ..
-                    i .. ": questID=" .. questID .. ", title='" .. (info.title or "unknown") .. "'")
+                        i .. ": questID=" .. questID .. ", title='" .. (info.title or "unknown") .. "'")
 
                     if trackedQuestIDs[questID] then
                         DebugPrint("  Quest " .. questID .. " already tracked, skipping")
@@ -586,9 +666,9 @@ local function FilterQuestsByZone()
         end
 
         DebugPrint("=== Step 2 complete: newly tracked " ..
-        tracked .. ", skipped (already tracked) " .. skipped .. " ===")
+            tracked .. ", skipped (already tracked) " .. skipped .. " ===")
         DebugPrint("=== FINAL: kept " ..
-        kept .. ", untracked " .. untracked .. ", newly tracked " .. tracked .. " quests ===")
+            kept .. ", untracked " .. untracked .. ", newly tracked " .. tracked .. " quests ===")
     end)
 end
 
@@ -686,6 +766,34 @@ local function OnAddonLoaded(loadedAddonName)
     end)
 end
 
+local function OpenConfigPanel()
+    if ns.CreateQuestLogCollapseConfigPanel then
+        local configPanel = ns.CreateQuestLogCollapseConfigPanel()
+        if Settings and Settings.OpenToCategory then
+            -- Try to register and open in the new settings system
+            if not configPanel.categoryID then
+                local category = Settings.RegisterCanvasLayoutCategory(configPanel, "QuestLogCollapse")
+                Settings.RegisterAddOnCategory(category)
+                configPanel.categoryID = category.ID
+            end
+            Settings.OpenToCategory(configPanel.categoryID)
+        elseif InterfaceOptionsFrame_OpenToCategory and configPanel then
+            -- Fallback to old interface options (check if function exists in global table)
+            local addCategoryFunc = _G["InterfaceOptions_AddCategory"]
+            if addCategoryFunc then
+                addCategoryFunc(configPanel)
+            end
+            InterfaceOptionsFrame_OpenToCategory(configPanel)
+            InterfaceOptionsFrame_OpenToCategory(configPanel) -- Called twice for proper display
+        else
+            -- Direct show if other methods fail
+            configPanel:Show()
+        end
+    else
+        print("|cff00ff00QuestLogCollapse|r Configuration panel not available.")
+    end
+end
+
 local function OnCombatStateChanged(event)
     if event == "PLAYER_REGEN_ENABLED" then
         for tracker, original in pairs(combatChangedTrackers) do
@@ -708,10 +816,11 @@ local function OnCombatStateChanged(event)
             DebugPrint("Applying queued opacity restoration after combat")
             ExpandQuestLog()
             combatStateQueue.shouldExpandOnCombatEnd = false
-        elseif combatStateQueue.shouldOpenConfigAfterCombat then
+        end
+        if combatStateQueue.shouldOpenConfigAfterCombat then
             DebugPrint("Opening configuration panel after combat")
-            ns.OpenConfigPanel()
             combatStateQueue.shouldOpenConfigAfterCombat = false
+            OpenConfigPanel()
         end
     elseif event == "PLAYER_REGEN_DISABLED" then
         local profile = (ns.GetCurrentQLCProfile and ns.GetCurrentQLCProfile()) or ns.db
@@ -838,33 +947,14 @@ function ns.HandleSlashCommand(msg)
     elseif args[1] == "config" then
         if InCombatLockdown() then
             -- Avoid opening config panel during combat to prevent taint, defer until combat ends
-            print("|cff00ff00QuestLogCollapse|r Cannot open configuration panel during combat. Please wait until combat ends.")
+            print(
+            "|cff00ff00QuestLogCollapse|r Cannot open configuration panel during combat. Please wait until combat ends.")
             -- add a flag to open the config panel after combat ends
             combatStateQueue.shouldOpenConfigAfterCombat = true
             return
         end
         if ns.CreateQuestLogCollapseConfigPanel then
-            local configPanel = ns.CreateQuestLogCollapseConfigPanel()
-            if Settings and Settings.OpenToCategory then
-                -- Try to register and open in the new settings system
-                if not configPanel.categoryID then
-                    local category = Settings.RegisterCanvasLayoutCategory(configPanel, "QuestLogCollapse")
-                    Settings.RegisterAddOnCategory(category)
-                    configPanel.categoryID = category.ID
-                end
-                Settings.OpenToCategory(configPanel.categoryID)
-            elseif InterfaceOptionsFrame_OpenToCategory and configPanel then
-                -- Fallback to old interface options (check if function exists in global table)
-                local addCategoryFunc = _G["InterfaceOptions_AddCategory"]
-                if addCategoryFunc then
-                    addCategoryFunc(configPanel)
-                end
-                InterfaceOptionsFrame_OpenToCategory(configPanel)
-                InterfaceOptionsFrame_OpenToCategory(configPanel) -- Called twice for proper display
-            else
-                -- Direct show if other methods fail
-                configPanel:Show()
-            end
+            OpenConfigPanel()
         else
             print("|cff00ff00QuestLogCollapse|r Configuration panel not available.")
         end

@@ -1,7 +1,7 @@
 -- QuestLogCollapse Configuration Panel
 -- Author: Gaspode
 -- Contributors: Artherion77 (significant ui revamp in 1.4.0)
--- Version: 1.7.2
+-- Version: 1.7.3
 -- Updated: 2026-11-15
 
 -- WOW FOREVER'S PROJECT ID IS: 18

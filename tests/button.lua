@@ -138,6 +138,23 @@ button.scripts.OnDragStop(button)
 assert(not controls.moving and ns.charDB.toggleButtonPosition.x == 120 and ns.charDB.toggleButtonPosition.y == -90, "Frame position was not saved")
 assert(quest:GetAlpha() == 1, "Dragging toggled section visibility")
 
+-- A config request is independent of queued tracker changes and opens only once.
+local configOpens = 0
+ns.CreateQuestLogCollapseConfigPanel = function()
+    return { Show = function() configOpens = configOpens + 1 end }
+end
+inCombat = true
+ns.HandleSlashCommand("config")
+click()
+assert(configOpens == 0, "Config opened during combat")
+inCombat = false
+event("PLAYER_REGEN_ENABLED")
+assert(configOpens == 1, "Deferred config did not open alongside queued tracker changes")
+assert(quest:GetAlpha() == 0, "Queued tracker change was not applied")
+event("PLAYER_REGEN_ENABLED")
+assert(configOpens == 1, "Deferred config opened more than once")
+click()
+
 -- Button visibility changes do not wait for map activity.
 click()
 assert(quest:GetAlpha() == 0 and campaign:GetAlpha() == 0, "Button did not hide all sections")

@@ -295,6 +295,10 @@ This project is open source. Feel free to modify and distribute as needed.
 
 ## Changelog
 
+### Version 1.7.3
+
+- Fixed a bug where the configuration panel would not open after combat due to a misplaced `end` statement in the event handler.
+
 ### Version 1.7.2
 
 - Added `/qlc config` to combat queue system to prevent taint errors.
