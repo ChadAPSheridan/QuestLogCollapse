@@ -36,7 +36,7 @@ local function run(savedDB, savedCharDB, isMainline)
 
     local methods = {}
     for _, name in ipairs({
-        "SetSize", "SetPoint", "SetBackdrop", "SetBackdropColor",
+        "SetSize", "SetPoint", "SetBackdrop", "SetBackdropColor", "SetTexture",
         "SetBackdropBorderColor", "SetTextColor", "SetColorTexture",
         "SetHeight", "SetScrollChild", "Disable", "SetMotionScriptsWhileDisabled",
         "SetMovable", "SetClampedToScreen", "RegisterForDrag", "EnableMouse",
@@ -202,10 +202,9 @@ local function run(savedDB, savedCharDB, isMainline)
     assert(globals.SLASH_QUESTLOGCOLLAPSE2 == "/questlogcollapse")
     assert(globals.SlashCmdList.QUESTLOGCOLLAPSE == ns.HandleSlashCommand)
     assert(globals.StaticPopupDialogs.QUESTLOGCOLLAPSE_NEW_PROFILE == ns.NewProfileDialog)
-    assert(globals.StaticPopupDialogs.QUESTLOGCOLLAPSE_DROP_GRAY)
     for key in pairs(globals.SlashCmdList) do assert(key == "QUESTLOGCOLLAPSE") end
     for key in pairs(globals.StaticPopupDialogs) do
-        assert(key == "QUESTLOGCOLLAPSE_NEW_PROFILE" or key == "QUESTLOGCOLLAPSE_DROP_GRAY")
+        assert(key == "QUESTLOGCOLLAPSE_NEW_PROFILE")
     end
     ns.HandleSlashCommand("config")
     assert(#categories == expectedCategories, "Opening settings duplicated registration")

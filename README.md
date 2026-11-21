@@ -27,7 +27,7 @@ profiles and `collapse*` setting keys remain compatible; `/qlc collapse` and
 - **Debug Mode**: Optional debug messages to track addon behavior
 - **Manual Control**: Commands to set configured sections to alpha 0 or restore all sections to alpha 1
 - **Show/Hide Button**: A moveable on-screen eye button to override the current state when needed
-- **Drop Gray Quests**: Abandon all eligible gray-difficulty quests after confirmation via a dedicated button in the configuration panel
+- **Drop Gray Quests**: Choose eligible gray-difficulty quests to abandon using the on-screen button
 - **No Native Collapse Calls**: Alpha changes avoid the native collapse/expand update path; this is not a guarantee against all Blizzard taint bugs
 - **Lightweight**: Minimal performance impact with efficient event handling
 
@@ -53,9 +53,10 @@ reserved. Right-drag either button or the surrounding frame to move it; its
 position is saved per character.
 
 The `Drop Gray Quests` button finds abandonable gray-difficulty quests, including
-those under collapsed quest-log headers. Confirming abandons the listed count;
-quest progress and associated quest items may be lost. Hidden or non-abandonable
-quests are excluded, and the action is unavailable during combat.
+those under collapsed quest-log headers. All listed quests are checked by default;
+uncheck any you want to keep before confirming. Quest progress and associated
+quest items may be lost. Hidden or non-abandonable quests are excluded, and the
+action is unavailable during combat.
 
 - `/qlc` or `/questlogcollapse` - Show help menu
 - `/qlc config` - Open the configuration panel (recommended)
@@ -127,7 +128,7 @@ For each instance type, choose which objective tracker sections become transpare
 
 - **Nameplate Control**: Show enemy nameplates according to each zone type's setting; restore your original setting when the active zone type does not request them
 - **Profile Management**: Create, switch, and manage multiple configuration profiles
-- **Drop Gray Quests**: Dedicated configuration button to abandon all eligible gray-difficulty quests after confirmation
+- **Drop Gray Quests**: On-screen button to select and abandon eligible gray-difficulty quests after confirmation
 
 ## How It Works
 
@@ -291,9 +292,13 @@ Feel free to submit issues, feature requests, or pull requests to improve this a
 
 ## License
 
-This project is open source. Feel free to modify and distribute as needed.
+This project is open source. Feel free to modify with attribution and distribute as needed.
 
 ## Changelog
+
+### Version 1.7.4
+
+- Added checklist to "Drop Grays" confirmation to select/show which quests are dropped.
 
 ### Version 1.7.3
 

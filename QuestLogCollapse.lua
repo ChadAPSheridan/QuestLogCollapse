@@ -1,8 +1,8 @@
 -- QuestLogCollapse: Automatically fades quest tracker sections when entering instances
 -- Author: Gaspode
 -- Contributors: Artherion77
--- Version: 1.7.3
--- Updated: 2026-11-15
+-- Version: 1.7.4
+-- Updated: 2026-11-21
 
 -- TAINT PROTECTION STRATEGY:
 -- Implemented namespace to avoid global variable pollution
@@ -10,7 +10,7 @@
 
 -- Use addon namespace to prevent global variable pollution and taint
 local addonName, ns = ...
-local ADDON_VERSION = "1.7.3"
+local ADDON_VERSION = "1.7.4"
 
 -- Create addon frame (local to prevent global pollution)
 local QuestLogCollapse = CreateFrame("Frame")
@@ -1248,7 +1248,7 @@ local function FindGrayQuests()
             ExpandQuestHeader(i)
         elseif info and not info.isHeader and not info.isHidden and info.questID
             and IsDroppableGrayQuest(info.questID) then
-            quests[#quests + 1] = info.questID
+            quests[#quests + 1] = { id = info.questID, title = info.title or ("Quest " .. info.questID) }
         end
         i = i + 1
     end
@@ -1258,39 +1258,111 @@ local function FindGrayQuests()
     return quests
 end
 
-StaticPopupDialogs.QUESTLOGCOLLAPSE_DROP_GRAY = {
-    text = "Abandon %d gray quests? Quest progress and associated quest items may be lost.",
-    button1 = YES,
-    button2 = NO,
-    OnAccept = function(_, quests)
-        if InCombatLockdown() then
-            print("|cff00ff00QuestLogCollapse|r Cannot abandon quests during combat.")
-            return
-        end
-        if not CanDropGrayQuests() then
-            print("|cff00ff00QuestLogCollapse|r Quest abandonment is unavailable on this client.")
-            return
-        end
-        local selectedQuest = C_QuestLog.GetSelectedQuest()
-        local requested = 0
-        for _, questID in ipairs(quests) do
-            if IsDroppableGrayQuest(questID) then
-                C_QuestLog.SetSelectedQuest(questID)
-                C_QuestLog.SetAbandonQuest()
-                C_QuestLog.AbandonQuest()
-                requested = requested + 1
+local dropGrayDialog
+
+local function ShowDropGrayDialog(quests)
+    if not dropGrayDialog then
+        local dialog = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
+        dialog:SetSize(400, 360)
+        dialog:SetPoint("CENTER")
+        dialog:SetFrameStrata("DIALOG")
+        dialog:SetClampedToScreen(true)
+        dialog:EnableMouse(true)
+        dialog:EnableKeyboard(true)
+        dialog:SetPropagateKeyboardInput(true)
+        dialog:SetScript("OnKeyDown", function(self, key)
+            self:SetPropagateKeyboardInput(key ~= "ESCAPE")
+            if key == "ESCAPE" then self:Hide() end
+        end)
+        dialog:SetBackdrop({
+            bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+            edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+            edgeSize = 32,
+            insets = { left = 11, right = 12, top = 12, bottom = 11 },
+        })
+
+        local warning = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        warning:SetPoint("TOPLEFT", dialog, "TOPLEFT", 25, -25)
+        warning:SetPoint("TOPRIGHT", dialog, "TOPRIGHT", -25, -25)
+        warning:SetText("Abandon selected gray quests? Quest progress and associated quest items may be lost.")
+
+        local scroll = CreateFrame("ScrollFrame", nil, dialog, "UIPanelScrollFrameTemplate")
+        scroll:SetPoint("TOPLEFT", dialog, "TOPLEFT", 25, -75)
+        scroll:SetPoint("BOTTOMRIGHT", dialog, "BOTTOMRIGHT", -45, 55)
+        local content = CreateFrame("Frame", nil, scroll)
+        content:SetSize(330, 1)
+        scroll:SetScrollChild(content)
+
+        local accept = CreateFrame("Button", nil, dialog, "UIPanelButtonTemplate")
+        accept:SetSize(100, 22)
+        accept:SetPoint("BOTTOM", dialog, "BOTTOM", -55, 20)
+        accept:SetText(YES)
+        local cancel = CreateFrame("Button", nil, dialog, "UIPanelButtonTemplate")
+        cancel:SetSize(100, 22)
+        cancel:SetPoint("BOTTOM", dialog, "BOTTOM", 55, 20)
+        cancel:SetText(NO)
+        cancel:SetScript("OnClick", function() dialog:Hide() end)
+
+        dialog.rows = {}
+        dialog.content = content
+        dialog.scroll = scroll
+        accept:SetScript("OnClick", function()
+            dialog:Hide()
+            if InCombatLockdown() then
+                print("|cff00ff00QuestLogCollapse|r Cannot abandon quests during combat.")
+                return
             end
+            if not CanDropGrayQuests() then
+                print("|cff00ff00QuestLogCollapse|r Quest abandonment is unavailable on this client.")
+                return
+            end
+            local selectedQuest = C_QuestLog.GetSelectedQuest()
+            local requested = 0
+            for _, row in ipairs(dialog.rows) do
+                if row.questID and row:GetChecked() and IsDroppableGrayQuest(row.questID) then
+                    C_QuestLog.SetSelectedQuest(row.questID)
+                    C_QuestLog.SetAbandonQuest()
+                    C_QuestLog.AbandonQuest()
+                    requested = requested + 1
+                end
+            end
+            if selectedQuest and selectedQuest > 0 and C_QuestLog.IsOnQuest(selectedQuest) then
+                C_QuestLog.SetSelectedQuest(selectedQuest)
+            end
+            print("|cff00ff00QuestLogCollapse|r Requested abandonment of " .. requested .. " gray quests.")
+        end)
+        dialog:Hide()
+        dropGrayDialog = dialog
+    end
+
+    local y = 0
+    for index, quest in ipairs(quests) do
+        local row = dropGrayDialog.rows[index]
+        if not row then
+            row = CreateFrame("CheckButton", nil, dropGrayDialog.content, "UICheckButtonTemplate")
+            row:SetSize(24, 24)
+            row.label = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+            row.label:SetPoint("TOPLEFT", row, "TOPRIGHT", 2, -3)
+            row.label:SetWidth(300)
+            row.label:SetJustifyH("LEFT")
+            dropGrayDialog.rows[index] = row
         end
-        if selectedQuest and selectedQuest > 0 and C_QuestLog.IsOnQuest(selectedQuest) then
-            C_QuestLog.SetSelectedQuest(selectedQuest)
-        end
-        print("|cff00ff00QuestLogCollapse|r Requested abandonment of " .. requested .. " gray quests.")
-    end,
-    timeout = 0,
-    whileDead = true,
-    hideOnEscape = true,
-    preferredIndex = 3,
-}
+        row:SetPoint("TOPLEFT", dropGrayDialog.content, "TOPLEFT", 0, -y)
+        row.questID = quest.id
+        row.label:SetText(quest.title)
+        row:SetChecked(true)
+        row:Show()
+        y = y + math.max(24, row.label:GetStringHeight() + 6)
+    end
+    for index = #quests + 1, #dropGrayDialog.rows do
+        dropGrayDialog.rows[index].questID = nil
+        dropGrayDialog.rows[index]:Hide()
+    end
+    dropGrayDialog.content:SetHeight(math.max(1, y))
+    dropGrayDialog.scroll:SetVerticalScroll(0)
+    dropGrayDialog:SetPropagateKeyboardInput(true)
+    dropGrayDialog:Show()
+end
 
 local dropGrayButton = CreateFrame("Button", nil, controlsFrame, "UIPanelButtonTemplate")
 dropGrayButton:SetSize(80, 22)
@@ -1309,7 +1381,7 @@ dropGrayButton:SetScript("OnClick", function()
         if #quests == 0 then
             print("|cff00ff00QuestLogCollapse|r No abandonable gray quests found.")
         else
-            StaticPopup_Show("QUESTLOGCOLLAPSE_DROP_GRAY", #quests, nil, quests)
+            ShowDropGrayDialog(quests)
         end
     end
 end)

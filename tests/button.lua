@@ -8,6 +8,17 @@ end
 function methods:SetScript(event, callback) self.scripts[event] = callback end
 function methods:RegisterEvent(event) self.events[event] = true end
 function methods:SetSize() end
+function methods:SetWidth() end
+function methods:SetHeight(height) self.height = height end
+function methods:SetFrameStrata() end
+function methods:EnableKeyboard() end
+function methods:SetPropagateKeyboardInput(enabled) self.propagateKeyboard = enabled end
+function methods:SetJustifyH() end
+function methods:GetStringHeight() return 12 end
+function methods:SetScrollChild(child) self.scrollChild = child end
+function methods:SetVerticalScroll(offset) self.scrollOffset = offset end
+function methods:SetChecked(checked) self.checked = checked end
+function methods:GetChecked() return self.checked end
 function methods:SetBackdrop() end
 function methods:SetBackdropColor() end
 function methods:SetBackdropBorderColor() end
@@ -50,7 +61,7 @@ function methods:EnableMouseWheel(enabled) assert(self:CanChangeProtectedState()
 function methods:SetCollapsed() error("Button must not call native collapse") end
 function methods:MarkDirty() error("Button must not trigger tracker layout") end
 
-local button, dropButton, controls
+local button, dropButton, controls, dialog, accept, cancel
 local globals = setmetatable({
     SlashCmdList = {},
     StaticPopupDialogs = {},
@@ -66,10 +77,13 @@ globals.CreateFrame = function(_, name, parent, template)
     local result = frame()
     frames[#frames + 1] = result
     if template == "UIPanelButtonTemplate" then
-        if not button then button = result else dropButton = result end
-        assert(parent == controls)
+        if parent == controls then
+            if not button then button = result else dropButton = result end
+        elseif parent == dialog then
+            if not accept then accept = result else cancel = result end
+        end
     elseif template == "BackdropTemplate" then
-        controls = result
+        if not controls then controls = result else dialog = result end
     end
     return result
 end
@@ -257,17 +271,18 @@ assert(protected.clicks and protected.motion and protected.wheel, "Protected inp
 -- Gray quest selection includes collapsed headers, but excludes hidden and non-abandonable quests.
 local groups = {
     { isHeader = true, isCollapsed = true, quests = {
-        { questID = 1 }, { questID = 2 }, { questID = 3, isHidden = true },
+        { questID = 1, title = "First quest" }, { questID = 2 }, { questID = 3, isHidden = true },
+        { questID = 8 },
     } },
     { isHeader = true, isCollapsed = true, quests = {
-        { questID = 4 }, { questID = 5 }, { questID = 6 },
+        { questID = 4, title = "Fourth quest" }, { questID = 5 }, { questID = 6, title = "Sixth quest" },
     } },
     { isHeader = true, isCollapsed = false, quests = { { questID = 7 } } },
 }
-local difficulties = { [1] = 0, [2] = 1, [3] = 0, [4] = 0, [5] = 0, [6] = 0, [7] = 1 }
-local onQuest = { [1] = true, [2] = true, [3] = true, [4] = true, [5] = true, [6] = true, [7] = true }
-local canAbandon = { [1] = true, [2] = true, [3] = true, [4] = true, [5] = false, [6] = true, [7] = true }
-local selected, abandon, dropped, popup = 2, nil, {}, nil
+local difficulties = { [1] = 0, [2] = 1, [3] = 0, [4] = 0, [5] = 0, [6] = 0, [7] = 1, [8] = 0 }
+local onQuest = { [1] = true, [2] = true, [3] = true, [4] = true, [5] = true, [6] = true, [7] = true, [8] = true }
+local canAbandon = { [1] = true, [2] = true, [3] = true, [4] = true, [5] = false, [6] = true, [7] = true, [8] = true }
+local selected, abandon, dropped = 2, nil, {}
 local function entries()
     local result = {}
     for _, group in ipairs(groups) do
@@ -292,27 +307,60 @@ globals.C_PlayerInfo = { GetContentDifficultyQuestForPlayer = function(id) retur
 globals.Enum = { RelativeContentDifficulty = { Trivial = 0 } }
 globals.ExpandQuestHeader = function(index) entries()[index].isCollapsed = false end
 globals.CollapseQuestHeader = function(index) entries()[index].isCollapsed = true end
-globals.StaticPopup_Show = function(name, count, _, data) popup = { name = name, count = count, quests = data } end
-
 dropButton.scripts.OnClick()
-assert(popup and popup.count == 3, "Wrong gray quest count")
+assert(dialog and dialog.shown and #dialog.rows == 4, "Wrong gray quest count")
+assert(dialog.rows[1].label.text == "First quest" and dialog.rows[2].label.text == "Quest 8"
+    and dialog.rows[3].label.text == "Fourth quest" and dialog.rows[4].label.text == "Sixth quest",
+    "Quest titles missing or out of order")
+for _, row in ipairs(dialog.rows) do assert(row:GetChecked(), "Quest not checked by default") end
 assert(groups[1].isCollapsed and groups[2].isCollapsed and not groups[3].isCollapsed, "Quest header states changed")
 assert(#dropped == 0, "Quests abandoned without confirmation")
-local dialog = globals.StaticPopupDialogs[popup.name]
+dialog.rows[1]:SetChecked(false)
 difficulties[4] = 1
-onQuest[6] = false
-dialog.OnAccept(nil, popup.quests)
-assert(#dropped == 1 and dropped[1] == 1, "Confirmation did not recheck selected quests")
+onQuest[8] = false
+accept.scripts.OnClick()
+assert(not dialog.shown and #dropped == 1 and dropped[1] == 6, "Confirmation ignored selection or eligibility")
 assert(selected == 2, "Previous quest selection was not restored")
 
-popup = nil
-inCombat = true
+-- Reopening resets selections and hides stale rows; cancellation does nothing.
 dropButton.scripts.OnClick()
-assert(not popup, "Drop button opened confirmation in combat")
-dialog.OnAccept(nil, { 4 })
+assert(dialog.shown and dialog.rows[1].questID == 1 and dialog.rows[1]:GetChecked(), "Reopening did not reset selection")
+assert(not dialog.rows[2].shown and not dialog.rows[3].shown and not dialog.rows[4].shown, "Stale rows remain visible")
+cancel.scripts.OnClick()
+assert(not dialog.shown and #dropped == 1, "Cancellation abandoned quests")
+dropButton.scripts.OnClick()
+dialog.scripts.OnKeyDown(dialog, "ESCAPE")
+assert(not dialog.shown and not dialog.propagateKeyboard and #dropped == 1, "Escape did not cancel")
+dropButton.scripts.OnClick()
+dialog.scripts.OnKeyDown(dialog, "A")
+assert(dialog.shown and dialog.propagateKeyboard, "Other keys were not propagated")
+dialog.rows[1]:SetChecked(false)
+accept.scripts.OnClick()
+assert(#dropped == 1, "An unchecked quest was abandoned")
+
+dropButton.scripts.OnClick()
+inCombat = true
+accept.scripts.OnClick()
 assert(#dropped == 1, "Confirmation abandoned quests in combat")
+dropButton.scripts.OnClick()
+assert(not dialog.shown, "Drop button opened confirmation in combat")
 inCombat = false
 canAbandon[1] = false
 dropButton.scripts.OnClick()
-assert(not popup, "Empty gray quest list opened confirmation")
+assert(not dialog.shown, "Empty gray quest list opened confirmation")
+
+-- A long list remains scrollable and its selections are all honored.
+for id = 10, 25 do
+    groups[3].quests[#groups[3].quests + 1] = { questID = id, title = "Quest " .. id }
+    difficulties[id], onQuest[id], canAbandon[id] = 0, true, true
+end
+dropButton.scripts.OnClick()
+assert(dialog.shown and #dialog.rows == 16 and dialog.content.height == 16 * 24, "Long list did not size its scroll content")
+dialog.scroll:SetVerticalScroll(100)
+dialog.rows[16]:SetChecked(false)
+accept.scripts.OnClick()
+assert(#dropped == 16 and dropped[16] == 24 and onQuest[25], "Long-list selection was not honored")
+dropButton.scripts.OnClick()
+assert(dialog.shown and dialog.scroll.scrollOffset == 0 and dialog.rows[1]:GetChecked(), "Reopened list did not reset")
+cancel.scripts.OnClick()
 print("Show/hide button checks passed")
